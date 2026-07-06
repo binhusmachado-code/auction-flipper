@@ -63,7 +63,7 @@ export default function MapView({ properties, onSelect, favorites }: Props) {
     : [39.8283, -98.5795] // Center of US
 
   return (
-    <div className="h-[600px] rounded-xl border border-gray-200 shadow-sm overflow-hidden relative">
+    <div className="h-[50vh] min-h-[350px] md:h-[600px] rounded-xl border border-gray-200 shadow-sm overflow-hidden relative">
       <MapContainer
         center={center as [number, number]}
         zoom={5}
