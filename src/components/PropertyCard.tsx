@@ -7,6 +7,7 @@ interface Props {
   onSelect: (p: Property) => void
   onToggleFavorite: (id: string) => void
   isFavorite: boolean
+  onViewImages?: (images: string[]) => void
 }
 
 function formatCurrency(n: number) {
@@ -21,10 +22,11 @@ function discountPercent(price: number, value: number) {
   return Math.round(((value - price) / value) * 100)
 }
 
-export default function PropertyCard({ property, onSelect, onToggleFavorite, isFavorite }: Props) {
+export default function PropertyCard({ property, onSelect, onToggleFavorite, isFavorite, onViewImages }: Props) {
   const [imgLoaded, setImgLoaded] = useState(false)
   const discount = discountPercent(property.price, property.estimatedValue)
   const profit = property.arv - property.price - property.rehabEstimate
+  const allImages = property.images.length > 0 ? [property.imageUrl, ...property.images] : [property.imageUrl]
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden group">
@@ -35,8 +37,12 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
         <img
           src={property.imageUrl}
           alt={property.address}
-          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${imgLoaded ? 'opacity-100' : 'opacity-0'} ${onViewImages ? 'cursor-pointer' : ''}`}
           onLoad={() => setImgLoaded(true)}
+          onClick={(e) => {
+            e.stopPropagation()
+            onViewImages?.(allImages)
+          }}
         />
         <div className="absolute top-3 left-3">
           <span className="px-2.5 py-1 text-xs font-semibold bg-brand-600 text-white rounded-full">
@@ -49,9 +55,15 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
               e.stopPropagation()
               onToggleFavorite(property.id)
             }}
-            className="p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white transition-colors"
+            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            className="p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white transition-all hover:scale-110"
           >
-            <Heart className={`w-4 h-4 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} />
+            <Heart
+              className={`w-5 h-5 transition-colors ${
+                isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'
+              }`}
+              fill={isFavorite ? 'currentColor' : 'none'}
+            />
           </button>
         </div>
         <div className="absolute bottom-3 left-3">
