@@ -1,0 +1,10 @@
+# Custom Domain for GitHub Pages
+# To use: replace this with your domain name (e.g., auctionflipper.com)
+# Then update DNS records to point to GitHub Pages
+# See: https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site
+
+# Example:
+# auctionflipper.com
+
+# For now, the site is available at:
+# https://binhusmachado-code.github.io/auction-flipper/
