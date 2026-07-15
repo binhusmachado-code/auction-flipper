@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, BarChart3, Heart, ExternalLink, Menu, X, Map as MapIcon, Scale, Bell, LogIn, LogOut, User } from 'lucide-react'
+import { Search, Plus, BarChart3, Heart, ExternalLink, Menu, X, Map as MapIcon, Scale, Bell, LogIn, LogOut, User, DollarSign } from 'lucide-react'
 import { Property, DealFilter } from './types/property'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useToast } from './components/ToastProvider.tsx'
@@ -80,7 +80,7 @@ export default function App() {
   }
 
   const handleAddProperty = async (p: Property) => {
-    const { data, error } = await supabase.from('properties').insert({
+    const { error } = await supabase.from('properties').insert({
       id: p.id,
       address: p.address,
       city: p.city,
@@ -273,6 +273,28 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Hero */}
+        <div className="mb-8 bg-brand-600 rounded-2xl p-6 sm:p-8 text-white relative overflow-hidden">
+          <div className="relative z-10">
+            <h2 className="text-2xl sm:text-3xl font-bold">Find Auction Deals. Flip for Profit.</h2>
+            <p className="mt-2 text-brand-100 text-sm sm:text-base max-w-xl">
+              Browse foreclosure, REO, and courthouse auction properties nationwide. Analyze deals with our built-in flip calculator.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/15 rounded-full text-xs font-medium backdrop-blur-sm">
+                <Search className="w-3.5 h-3.5" /> {stats.total} Properties
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/15 rounded-full text-xs font-medium backdrop-blur-sm">
+                <BarChart3 className="w-3.5 h-3.5" /> {stats.avgDiscount.toFixed(0)}% Avg Discount
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/15 rounded-full text-xs font-medium backdrop-blur-sm">
+                <DollarSign className="w-3.5 h-3.5" /> {formatCurrency(stats.totalProfit)} Potential
+              </span>
+            </div>
+          </div>
+          <div className="absolute right-0 top-0 h-full w-1/3 bg-brand-700/30 -skew-x-12 transform origin-top-right" />
+        </div>
+
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
