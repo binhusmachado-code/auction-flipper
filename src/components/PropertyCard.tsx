@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MapPin, Bed, Bath, Square, Calendar, DollarSign, Hammer, ArrowRight, TrendingUp, ExternalLink, Heart } from 'lucide-react'
+import { MapPin, Bed, Bath, Square, Calendar, DollarSign, Hammer, ArrowRight, TrendingUp, ExternalLink, Heart, Calculator } from 'lucide-react'
 import { Property } from '../types/property'
 
 interface Props {
@@ -56,13 +56,17 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
               onToggleFavorite(property.id)
             }}
             title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-            className="p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-sm hover:bg-white transition-all hover:scale-110"
+            className={`p-2 rounded-full shadow-sm transition-all hover:scale-110 ${
+              isFavorite
+                ? 'bg-red-100 text-red-500'
+                : 'bg-white/90 backdrop-blur-sm text-gray-400 hover:text-red-400'
+            }`}
           >
             <Heart
               className={`w-5 h-5 transition-colors ${
-                isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'
+                isFavorite ? 'fill-red-500 text-red-500' : ''
               }`}
-              fill={isFavorite ? 'currentColor' : 'none'}
+              fill={isFavorite ? '#ef4444' : 'none'}
             />
           </button>
         </div>
@@ -135,13 +139,15 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
           </div>
         </div>
 
-        <button
-          onClick={() => onSelect(property)}
-          className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors"
-        >
-          Analyze Deal
-          <ArrowRight className="w-4 h-4" />
-        </button>
+          <button
+            onClick={() => onSelect(property)}
+            className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors"
+            data-testid="deal-calculator-button"
+          >
+            <Calculator className="w-4 h-4" />
+            Deal Calculator
+            <ArrowRight className="w-4 h-4" />
+          </button>
       </div>
     </div>
   )
