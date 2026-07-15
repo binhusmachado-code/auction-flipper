@@ -4,19 +4,27 @@ import { useToast } from '../components/ToastProvider.tsx'
 import type { Property } from '../types/property'
 
 export function useSupabaseAuth() {
-  const [user, setUser] = useState(supabase.auth.getUser())
+  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
+    let mounted = true
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+      if (mounted) {
+        setUser(session?.user ?? null)
+        setLoading(false)
+      }
     })
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-      setLoading(false)
+    supabase.auth.getUser().then(({ data }: any) => {
+      if (mounted) {
+        setUser(data.user)
+        setLoading(false)
+      }
     })
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   return { user, loading }
@@ -33,7 +41,7 @@ export function useSupabaseProperties() {
       .from('properties')
       .select('*')
       .order('price', { ascending: true })
-      .then(({ data, error }) => {
+      .then(({ data, error }: any) => {
         if (cancelled) return
         if (error) {
           showToast('Failed to load properties', 'error')
@@ -142,7 +150,7 @@ export function useSupabaseFavorites(userId: string | null) {
       .from('user_favorites')
       .select('property_id')
       .eq('user_id', userId)
-      .then(({ data, error }) => {
+      .then(({ data, error }: any) => {
         if (cancelled) return
         if (error) {
           showToast('Failed to load favorites', 'error')
@@ -205,7 +213,7 @@ export function useSupabaseAlerts(userId: string | null) {
       .from('user_alerts')
       .select('*')
       .eq('user_id', userId)
-      .then(({ data, error }) => {
+      .then(({ data, error }: any) => {
         if (cancelled) return
         if (error) {
           showToast('Failed to load alerts', 'error')
