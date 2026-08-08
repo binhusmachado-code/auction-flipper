@@ -34,6 +34,61 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://weguwjxuvibbyqrrvqcw.supa
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_JauuTENFT1-RfVMhL7FJPQ_VtSxzhGI")
 
 
+def push_to_supabase(properties: List[ScrapedProperty]):
+    """Push properties directly to Supabase database."""
+    print(f"📡 Pushing {len(properties)} properties to Supabase...")
+    url = f"{SUPABASE_URL}/rest/v1/properties"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates"
+    }
+    
+    key_map = {
+        "estimatedValue": "estimated_value",
+        "lotSize": "lot_size",
+        "yearBuilt": "year_built",
+        "propertyType": "property_type",
+        "auctionDate": "auction_date",
+        "auctionType": "auction_type",
+        "sourceUrl": "source_url",
+        "imageUrl": "image_url",
+        "daysOnMarket": "days_on_market",
+        "rehabEstimate": "rehab_estimate",
+        "caseNumber": "case_number",
+        "openingBid": "opening_bid",
+        "depositRequired": "deposit_required",
+    }
+    
+    inserted = 0
+    errors = []
+    
+    for p in properties:
+        data = p.to_app_format()
+        row = {key_map.get(k, k): v for k, v in data.items()}
+        if not row.get("images"):
+            row["images"] = []
+        
+        try:
+            resp = requests.post(url, headers=headers, json=row, timeout=30)
+            if resp.status_code in (200, 201):
+                inserted += 1
+            else:
+                errors.append(f"{p.id}: {resp.status_code} - {resp.text[:100]}")
+        except Exception as e:
+            errors.append(f"{p.id}: {str(e)}")
+        
+        time.sleep(0.05)
+    
+    print(f"✅ Inserted {inserted}/{len(properties)} properties to Supabase")
+    if errors:
+        print(f"⚠️ {len(errors)} errors:")
+        for e in errors[:5]:
+            print(f"   {e}")
+    return inserted
+
+
 @dataclass
 class ScrapedProperty:
     id: str
@@ -102,61 +157,6 @@ class ScrapedProperty:
             "openingBid": self.opening_bid,
             "depositRequired": self.deposit_required,
         }
-
-
-def push_to_supabase(properties: List[ScrapedProperty]):
-    """Push properties directly to Supabase database."""
-    print(f"📡 Pushing {len(properties)} properties to Supabase...")
-    url = f"{SUPABASE_URL}/rest/v1/properties"
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates"
-    }
-    
-    key_map = {
-        "estimatedValue": "estimated_value",
-        "lotSize": "lot_size",
-        "yearBuilt": "year_built",
-        "propertyType": "property_type",
-        "auctionDate": "auction_date",
-        "auctionType": "auction_type",
-        "sourceUrl": "source_url",
-        "imageUrl": "image_url",
-        "daysOnMarket": "days_on_market",
-        "rehabEstimate": "rehab_estimate",
-        "caseNumber": "case_number",
-        "openingBid": "opening_bid",
-        "depositRequired": "deposit_required",
-    }
-    
-    inserted = 0
-    errors = []
-    
-    for p in properties:
-        data = p.to_app_format()
-        row = {key_map.get(k, k): v for k, v in data.items()}
-        if not row.get("images"):
-            row["images"] = []
-        
-        try:
-            resp = requests.post(url, headers=headers, json=row, timeout=30)
-            if resp.status_code in (200, 201):
-                inserted += 1
-            else:
-                errors.append(f"{p.id}: {resp.status_code} - {resp.text[:100]}")
-        except Exception as e:
-            errors.append(f"{p.id}: {str(e)}")
-        
-        time.sleep(0.05)
-    
-    print(f"✅ Inserted {inserted}/{len(properties)} properties to Supabase")
-    if errors:
-        print(f"⚠️ {len(errors)} errors:")
-        for e in errors[:5]:
-            print(f"   {e}")
-    return inserted
 
 
 class BaseScraper:
