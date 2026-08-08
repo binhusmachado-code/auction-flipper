@@ -1,0 +1,30 @@
+Loaded 910 from backup
+🗑️  Clearing old fake data from Supabase...
+   ⚠️  DELETE returned 400: {"code":"21000","details":null,"hint":null,"message":"DELETE requires a WHERE clause"}
+📡 Pushing 910 properties to Supabase...
+   ... 50/910 inserted
+   ... 100/910 inserted
+   ... 150/910 inserted
+   ... 200/910 inserted
+   ... 250/910 inserted
+   ... 300/910 inserted
+   ... 350/910 inserted
+   ... 400/910 inserted
+   ... 450/910 inserted
+   ... 500/910 inserted
+   ... 550/910 inserted
+   ... 600/910 inserted
+   ... 650/910 inserted
+   ... 700/910 inserted
+   ... 750/910 inserted
+   ... 800/910 inserted
+   ... 850/910 inserted
+   ... 900/910 inserted
+✅ Inserted 900/910 properties
+⚠️  10 errors (showing first 5):
+   freddie-3006_hawthorne_street_sarasota_fl_34239: 400 - {"code":"23502","details":null,"hint":null,"message":"null value in column \"address\" of relation \"properties\" violates not-null constraint"}
+   freddie-7330_nw_18th_st_204_margate_fl_33063: 400 - {"code":"23502","details":null,"hint":null,"message":"null value in column \"address\" of relation \"properties\" violates not-null constraint"}
+   freddie-2206_s_cypress_bend_dr_apt_801_pompano_beach_fl_33069: 400 - {"code":"23502","details":null,"hint":null,"message":"null value in column \"address\" of relation \"properties\" violates not-null constraint"}
+   freddie-31603_chollerford_court_fulshear_tx_77441: 400 - {"code":"23502","details":null,"hint":null,"message":"null value in column \"address\" of relation \"properties\" violates not-null constraint"}
+   freddie-1310_ainsley_way_dr_pearland_tx_77581: 400 - {"code":"23502","details":null,"hint":null,"message":"null value in column \"address\" of relation \"properties\" violates not-null constraint"}
+REPUSH DONE

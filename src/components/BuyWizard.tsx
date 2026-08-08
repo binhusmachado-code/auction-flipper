@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { X, ArrowLeft, ArrowRight, Check, Home, User, CreditCard, ClipboardCheck, PartyPopper, ShieldCheck, MapPin } from 'lucide-react'
+import { X, ArrowLeft, ArrowRight, Check, Home, User, CreditCard, ClipboardCheck, PartyPopper, ShieldCheck, MapPin, Loader2, MailWarning, BookOpen } from 'lucide-react'
 import { Property } from '../types/property'
 import { dealProfit, dealRoi, formatMoney, totalCost, marketValue } from '../lib/deal'
+import { supabase } from '../lib/supabase.ts'
 
 interface Props {
   property: Property
+  userId?: string | null
   onClose: () => void
+  onOpenGuide?: () => void
 }
 
 const STEPS = [
@@ -22,11 +25,15 @@ interface BuyerInfo {
   phone: string
 }
 
-export default function BuyWizard({ property, onClose }: Props) {
+export default function BuyWizard({ property, userId = null, onClose, onOpenGuide }: Props) {
   const [step, setStep] = useState(0)
   const [buyer, setBuyer] = useState<BuyerInfo>({ fullName: '', email: '', phone: '' })
   const [paymentMethod, setPaymentMethod] = useState<'wire' | 'card' | 'cashier'>('wire')
   const [agreed, setAgreed] = useState(false)
+  const [placing, setPlacing] = useState(false)
+  const [orderId, setOrderId] = useState<string | null>(null)
+  const [emailSent, setEmailSent] = useState(false)
+  const [orderError, setOrderError] = useState<string | null>(null)
 
   const price = property.price || 0
   const deposit = property.depositRequired || Math.max(500, Math.round(price * 0.1))
@@ -39,11 +46,66 @@ export default function BuyWizard({ property, onClose }: Props) {
     step === 0 ? true :
     step === 1 ? buyer.fullName.trim().length > 1 && /.+@.+\..+/.test(buyer.email) :
     step === 2 ? true :
-    step === 3 ? agreed :
+    step === 3 ? agreed && !placing :
     false
 
   const next = () => { if (canNext && step < 4) setStep(step + 1) }
   const back = () => { if (step > 0 && step < 4) setStep(step - 1) }
+
+  const placeOrder = async () => {
+    if (!agreed || placing) return
+    setPlacing(true)
+    setOrderError(null)
+    try {
+      // 1) Save the order (id generated here — guests can't read orders back, so we don't use .select())
+      const newOrderId = crypto.randomUUID()
+      const { error } = await supabase
+        .from('orders')
+        .insert({
+          id: newOrderId,
+          property_id: property.id,
+          property_address: `${property.address}, ${property.city}, ${property.state} ${property.zip}`,
+          buyer_name: buyer.fullName.trim(),
+          buyer_email: buyer.email.trim(),
+          buyer_phone: buyer.phone.trim(),
+          payment_method: paymentMethod,
+          deposit_amount: deposit,
+          total_price: price,
+          user_id: userId,
+        })
+
+      if (error) throw new Error(error.message)
+      setOrderId(newOrderId)
+
+      // 2) Send the confirmation email (best effort — the order is safe either way)
+      try {
+        const { error: fnError } = await supabase.functions.invoke('send-order-confirmation', {
+          body: {
+            orderId: newOrderId,
+            buyerName: buyer.fullName.trim(),
+            buyerEmail: buyer.email.trim(),
+            propertyAddress: property.address,
+            propertyCityState: `${property.city}, ${property.state} ${property.zip}`,
+            saleType: property.saleType,
+            auctionType: property.auctionType,
+            auctionDate: property.auctionDate,
+            depositAmount: deposit,
+            totalPrice: price,
+            paymentMethod,
+          },
+        })
+        setEmailSent(!fnError)
+      } catch {
+        setEmailSent(false)
+      }
+
+      setStep(4)
+    } catch (err) {
+      setOrderError(err instanceof Error ? err.message : 'Something went wrong placing your order. Please try again.')
+    } finally {
+      setPlacing(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
@@ -122,6 +184,16 @@ export default function BuyWizard({ property, onClose }: Props) {
                 <strong>{formatMoney(value)}</strong>. That's about{' '}
                 <strong className="text-emerald-400">{roi.toFixed(0)}% return</strong> on your money.
               </div>
+
+              {onOpenGuide && (
+                <button
+                  onClick={onOpenGuide}
+                  className="w-full flex items-center justify-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  New to auctions? Read the Buyer Guide first
+                </button>
+              )}
             </div>
           )}
 
@@ -204,12 +276,22 @@ export default function BuyWizard({ property, onClose }: Props) {
                 ))}
               </div>
 
-              <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Your deposit is held safely and is <strong className="text-zinc-200">fully refundable</strong> if
-                  your bid doesn't win. No surprises.
-                </p>
+              <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-2.5">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    <strong className="text-zinc-200">About the deposit:</strong> this is a good-faith payment that reserves
+                    your spot in the auction. It is paid to the auction authority (county, bank, or auction house) —
+                    <strong className="text-zinc-200"> never to this website</strong> — using the instructions we email you.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3 pl-8">
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    • If you <strong className="text-zinc-300">don't win</strong>, it's refunded in full.<br />
+                    • If you <strong className="text-zinc-300">win</strong>, it counts toward your price — it's not an extra fee.<br />
+                    • You only lose it if you win and then <strong className="text-zinc-300">don't pay the balance</strong> by the deadline.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -250,6 +332,12 @@ export default function BuyWizard({ property, onClose }: Props) {
                   the property (or have someone check it) before the auction. My deposit is refunded if I don't win.
                 </span>
               </label>
+
+              {orderError && (
+                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 text-xs text-rose-300 leading-relaxed">
+                  <strong>Couldn't place your order:</strong> {orderError}
+                </div>
+              )}
             </div>
           )}
 
@@ -260,9 +348,29 @@ export default function BuyWizard({ property, onClose }: Props) {
                 <PartyPopper className="w-10 h-10 text-emerald-400" />
               </div>
               <h3 className="text-2xl font-extrabold text-white">You're all set, {buyer.fullName.split(' ')[0]}! 🎉</h3>
-              <p className="text-zinc-400 text-sm max-w-sm mx-auto leading-relaxed">
-                We emailed your step-by-step guide to <strong className="text-zinc-200">{buyer.email}</strong>.
-              </p>
+
+              {emailSent ? (
+                <p className="text-zinc-400 text-sm max-w-sm mx-auto leading-relaxed">
+                  We emailed your step-by-step guide to <strong className="text-zinc-200">{buyer.email}</strong>.
+                  Don't see it? Check your spam folder.
+                </p>
+              ) : (
+                <div className="max-w-sm mx-auto bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 flex items-start gap-3 text-left">
+                  <MailWarning className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-200/80 leading-relaxed">
+                    Your order is <strong>saved</strong>, but the confirmation email couldn't be sent yet
+                    (email delivery is still being activated on our side). Save your order reference below —
+                    you don't need to order again.
+                  </p>
+                </div>
+              )}
+
+              {orderId && (
+                <div className="inline-block bg-zinc-950 border border-zinc-800 rounded-xl px-5 py-2.5">
+                  <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-bold">Order reference&nbsp;&nbsp;</span>
+                  <span className="text-sm font-mono font-bold text-emerald-400">{orderId.slice(0, 8).toUpperCase()}</span>
+                </div>
+              )}
 
               <div className="bg-zinc-950 rounded-2xl border border-zinc-800 p-5 text-left space-y-3">
                 <div className="text-xs font-bold uppercase tracking-wider text-emerald-400">What happens next</div>
@@ -282,9 +390,20 @@ export default function BuyWizard({ property, onClose }: Props) {
                 ))}
               </div>
 
-              <button onClick={onClose} className="pill-btn w-full justify-center">
-                Back to Deals
-              </button>
+              <div className="flex flex-col gap-2">
+                {onOpenGuide && (
+                  <button
+                    onClick={onOpenGuide}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold transition-all"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Read the Buyer Guide
+                  </button>
+                )}
+                <button onClick={onClose} className="pill-btn w-full justify-center">
+                  Back to Deals
+                </button>
+              </div>
             </div>
           )}
 
@@ -294,24 +413,49 @@ export default function BuyWizard({ property, onClose }: Props) {
               {step > 0 && (
                 <button
                   onClick={back}
-                  className="flex items-center gap-2 px-5 py-3.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold transition-all"
+                  disabled={placing}
+                  className="flex items-center gap-2 px-5 py-3.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold transition-all disabled:opacity-50"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   Back
                 </button>
               )}
-              <button
-                onClick={next}
-                disabled={!canNext}
-                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all ${
-                  canNext
-                    ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 active:scale-[0.98]'
-                    : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-                }`}
-              >
-                {step === 3 ? 'Place My Order 🚀' : 'Next Step'}
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {step === 3 ? (
+                <button
+                  onClick={placeOrder}
+                  disabled={!canNext}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all ${
+                    canNext
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 active:scale-[0.98]'
+                      : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                  }`}
+                >
+                  {placing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Placing your order...
+                    </>
+                  ) : (
+                    <>
+                      Place My Order 🚀
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={next}
+                  disabled={!canNext}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all ${
+                    canNext
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 active:scale-[0.98]'
+                      : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                  }`}
+                >
+                  Next Step
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
             </div>
           )}
         </div>

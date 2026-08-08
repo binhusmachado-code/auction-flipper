@@ -1,0 +1,30 @@
+Loaded 910 from backup
+🗑️  Clearing old fake data from Supabase...
+   ⚠️  DELETE returned 400: {"code":"21000","details":null,"hint":null,"message":"DELETE requires a WHERE clause"}
+📡 Pushing 910 properties to Supabase...
+   ... 50/910 inserted
+   ... 100/910 inserted
+   ... 150/910 inserted
+   ... 200/910 inserted
+   ... 250/910 inserted
+   ... 300/910 inserted
+   ... 350/910 inserted
+   ... 400/910 inserted
+   ... 450/910 inserted
+   ... 500/910 inserted
+   ... 550/910 inserted
+   ... 600/910 inserted
+   ... 650/910 inserted
+   ... 700/910 inserted
+   ... 750/910 inserted
+   ... 800/910 inserted
+   ... 850/910 inserted
+   ... 900/910 inserted
+✅ Inserted 0/910 properties
+⚠️  910 errors (showing first 5):
+   fannie-780574e6-ceb4-4de8-98c4-5a138bf82dab: 401 - {"code":"42501","details":null,"hint":null,"message":"new row violates row-level security policy for table \"properties\""}
+   fannie-63a7fa55-1cbe-467c-bd3c-f30ef69a2313: 401 - {"code":"42501","details":null,"hint":null,"message":"new row violates row-level security policy for table \"properties\""}
+   fannie-2cdf8cf6-6227-4181-845a-895bbe0942ac: 401 - {"code":"42501","details":null,"hint":null,"message":"new row violates row-level security policy for table \"properties\""}
+   fannie-9bbe7b2d-b583-4c37-b470-c8949358de72: 401 - {"code":"42501","details":null,"hint":null,"message":"new row violates row-level security policy for table \"properties\""}
+   fannie-66a1fade-d952-4094-ac4e-a552cf33d0cd: 401 - {"code":"42501","details":null,"hint":null,"message":"new row violates row-level security policy for table \"properties\""}
+REPUSH DONE

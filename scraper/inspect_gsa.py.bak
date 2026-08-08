@@ -1,0 +1,12 @@
+import json
+
+data = json.load(open('gsa_test.json'))
+print(f"Total: {len(data)}")
+print("\n--- First 30 items ---")
+for p in data[:30]:
+    print(f"{p['property_type']:12} | ${p['price']:>8} | {p['address'][:45]:45} | {p['notes'][:50]}")
+
+print("\n--- Items with price > $1000 ---")
+for p in data:
+    if p['price'] > 1000:
+        print(f"{p['property_type']:12} | ${p['price']:>10,} | {p['address'][:45]:45}")

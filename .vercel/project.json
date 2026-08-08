@@ -1,0 +1,16 @@
+{
+  "projectId": "prj_xR6oSiPbT7UwIPwV7tuO1nZotQOw",
+  "orgId": "team_V4atJZaMbKuKtay11BOdAYmQ",
+  "projectName": "auction-flipper",
+  "settings": {
+    "createdAt": 1786156313590,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}

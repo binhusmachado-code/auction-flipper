@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, Percent, MapPin, BookOpen, Scale, Info, Building2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, MapPin, BookOpen, ChevronDown, ChevronUp } from 'lucide-react'
 import { Property, DealFilter, STATE_TAX_SALE_DATA } from './types/property'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useToast } from './components/ToastProvider.tsx'
@@ -10,6 +10,7 @@ import PropertyCard from './components/PropertyCard'
 import MapView from './components/MapView'
 import AuthModal from './components/AuthModal.tsx'
 import BuyWizard from './components/BuyWizard.tsx'
+import Guide from './components/Guide.tsx'
 import { isProfitable, dealProfit } from './lib/deal.ts'
 import './index.css'
 
@@ -31,7 +32,7 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showStateDirectory, setShowStateDirectory] = useState(false)
-  const [showEducation, setShowEducation] = useState(false)
+  const [showGuide, setShowGuide] = useState(false)
   const [view, setView] = useState<'all' | 'favorites' | 'map'>('all')
   const [filter, setFilter] = useState<DealFilter>({
     state: '',
@@ -71,6 +72,12 @@ export default function App() {
         return isAdding ? [...prev, id] : prev.filter((f) => f !== id)
       })
     }
+  }
+
+  const openGuide = () => {
+    setBuyProperty(null)
+    setShowMobileMenu(false)
+    setShowGuide(true)
   }
 
   const filtered = useMemo(() => {
@@ -129,6 +136,17 @@ export default function App() {
     </button>
   )
 
+  const guideLink = (
+    <button
+      key="guide"
+      onClick={openGuide}
+      className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all duration-300"
+    >
+      <BookOpen className="w-3.5 h-3.5" />
+      Guide
+    </button>
+  )
+
   return (
     <div className="min-h-screen bg-zinc-950">
       {/* Floating Nav */}
@@ -146,6 +164,7 @@ export default function App() {
               {navLink('all', 'All', <Search className="w-3.5 h-3.5" />)}
               {navLink('map', 'Map', <MapIcon className="w-3.5 h-3.5" />)}
               {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
+              {guideLink}
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -178,6 +197,7 @@ export default function App() {
               {navLink('all', 'All Deals', <Search className="w-3.5 h-3.5" />)}
               {navLink('map', 'Map View', <MapIcon className="w-3.5 h-3.5" />)}
               {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
+              {guideLink}
             </div>
           )}
         </div>
@@ -229,11 +249,11 @@ export default function App() {
               </span>
             </button>
             <button
-              onClick={() => setShowEducation(!showEducation)}
+              onClick={openGuide}
               className="pill-btn-outline"
             >
               <BookOpen className="w-4 h-4" />
-              Learn
+              Buyer Guide
             </button>
           </div>
         </div>
@@ -362,75 +382,6 @@ export default function App() {
             </div>
           )}
         </div>
-
-        {/* Education */}
-        {showEducation && (
-          <div className="mt-12 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-8 animate-fade-in">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
-                <Info className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                <h3 className="font-bold text-zinc-100 text-lg">Tax Lien vs Tax Deed Investing</h3>
-                <p className="text-sm text-zinc-500 mt-1">Understanding the two main strategies</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-5 bg-zinc-950/50 rounded-xl border border-zinc-800/40">
-                <div className="flex items-center gap-2 mb-3">
-                  <Percent className="w-5 h-5 text-emerald-400" />
-                  <h4 className="font-bold text-emerald-400">Tax Lien</h4>
-                </div>
-                <p className="text-sm text-zinc-400 leading-relaxed mb-3">
-                  You buy the delinquent tax debt. The property owner must pay you back 
-                  with interest (typically 12-18% annually) within a redemption period 
-                  (6 months to 3 years). You don't own the property—you own the debt.
-                </p>
-                <ul className="text-xs text-zinc-500 space-y-1">
-                  <li>• Lower capital required ($500-$50K per lien)</li>
-                  <li>• Fixed interest rate returns</li>
-                  <li>• No property management</li>
-                  <li>• Risk: owner pays, you get your money + interest back</li>
-                </ul>
-              </div>
-
-              <div className="p-5 bg-zinc-950/50 rounded-xl border border-zinc-800/40">
-                <div className="flex items-center gap-2 mb-3">
-                  <Building2 className="w-5 h-5 text-amber-400" />
-                  <h4 className="font-bold text-amber-400">Tax Deed</h4>
-                </div>
-                <p className="text-sm text-zinc-400 leading-relaxed mb-3">
-                  You buy the actual property at auction when taxes go unpaid for too long. 
-                  The previous owner loses all rights. You own the property outright and can 
-                  sell, rent, or develop it.
-                </p>
-                <ul className="text-xs text-zinc-500 space-y-1">
-                  <li>• Higher capital required (full property value)</li>
-                  <li>• Potential for large profits if property is undervalued</li>
-                  <li>• You own the real estate</li>
-                  <li>• Risk: property may have issues, need clean title</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="mt-6 p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
-              <div className="flex items-start gap-3">
-                <Scale className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h5 className="font-bold text-zinc-200 text-sm">How It Works</h5>
-                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                    When property owners don't pay taxes, counties sell the debt (lien) or the property (deed) 
-                    to investors. This recovers tax revenue for the county and gives investors a chance to earn 
-                    returns secured by real estate. In lien states, if the owner doesn't pay within the redemption 
-                    period, you may be able to foreclose and get the property. In deed states, you get the property 
-                    immediately after auction.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Data Sources */}
         <div className="mt-16 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-8">
@@ -564,7 +515,16 @@ export default function App() {
       )}
 
       {buyProperty && (
-        <BuyWizard property={buyProperty} onClose={() => setBuyProperty(null)} />
+        <BuyWizard
+          property={buyProperty}
+          userId={user?.id ?? null}
+          onClose={() => setBuyProperty(null)}
+          onOpenGuide={openGuide}
+        />
+      )}
+
+      {showGuide && (
+        <Guide onClose={() => setShowGuide(false)} />
       )}
     </div>
   )

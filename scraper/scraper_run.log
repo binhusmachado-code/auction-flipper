@@ -1,0 +1,267 @@
+======================================================================
+🏠 AUCTION FLIPPER - REAL DATA PIPELINE
+   Fetching live properties from 6 free government sources
+======================================================================
+
+Started at: 2026-08-07 14:11:47
+
+
+============================================================
+[1/6] HUD Home Store (hudhomestore.gov)
+============================================================
+Scraping HUD Home Store for 20 states...
+Endpoint: https://www.hudhomestore.gov/searchresult?citystate={STATE}
+
+[1/20] Fetching TX...
+  [TX] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [TX] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [TX] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[2/20] Fetching FL...
+  [FL] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [FL] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [FL] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[3/20] Fetching CA...
+  [CA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [CA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [CA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[4/20] Fetching GA...
+  [GA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [GA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [GA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[5/20] Fetching IL...
+  [IL] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [IL] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [IL] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[6/20] Fetching MI...
+  [MI] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [MI] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [MI] Network error: [Errno 54] Connection reset by peer (attempt 3/3)
+  -> No properties found
+[7/20] Fetching OH...
+  [OH] Network error: [Errno 54] Connection reset by peer (attempt 1/3)
+  [OH] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [OH] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[8/20] Fetching NC...
+  [NC] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [NC] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [NC] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[9/20] Fetching AZ...
+  [AZ] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [AZ] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [AZ] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[10/20] Fetching PA...
+  [PA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [PA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [PA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[11/20] Fetching TN...
+  [TN] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [TN] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [TN] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[12/20] Fetching MO...
+  [MO] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [MO] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [MO] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[13/20] Fetching IN...
+  [IN] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [IN] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [IN] Network error: [Errno 54] Connection reset by peer (attempt 3/3)
+  -> No properties found
+[14/20] Fetching SC...
+  [SC] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [SC] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [SC] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[15/20] Fetching AL...
+  [AL] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [AL] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [AL] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[16/20] Fetching KY...
+  [KY] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [KY] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [KY] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[17/20] Fetching LA...
+  [LA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [LA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [LA] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[18/20] Fetching OK...
+  [OK] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [OK] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [OK] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[19/20] Fetching AR...
+  [AR] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [AR] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [AR] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+[20/20] Fetching MS...
+  [MS] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 1/3)
+  [MS] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 2/3)
+  [MS] Network error: [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010) (attempt 3/3)
+  -> No properties found
+
+=== Results ===
+States searched: 20
+Total raw properties: 0
+Total mapped properties: 0
+   -> 0 HUD properties
+
+============================================================
+[2/6] Fannie Mae HomePath (homepath.fanniemae.com)
+============================================================
+[INFO] Page 1: fetched 400 raw / 400 matched | total server records: 572138
+   -> 400 Fannie Mae properties
+
+============================================================
+[3/6] Freddie Mac HomeSteps (homesteps.com)
+============================================================
+[HomeSteps] Searching: 'FL' ...
+[HomeSteps] Found 58 listings for 'FL'
+[HomeSteps] Searching: 'TX' ...
+[HomeSteps] Found 135 listings for 'TX'
+[HomeSteps] Searching: 'CA' ...
+[HomeSteps] Found 54 listings for 'CA'
+[HomeSteps] Searching: 'GA' ...
+[HomeSteps] Found 30 listings for 'GA'INFO: Starting Treasury/IRS auction scraper...
+INFO: Fetching listing page: https://www.treasury.gov/auctions/treasury/rp/realprop.shtml
+INFO: Found 15 properties on listing page
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/4615foresthill.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/129thcourt.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/5645whitner.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/2281marks.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/21shinnecock.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/4705battle.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/879railway.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/187surprise.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/21370military.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/1002silvercircle.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/106southbay.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/1593topnotch.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/48tumbleweed.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/merryhill.shtml
+INFO: Fetching detail page: https://www.treasury.gov/auctions/treasury/rp/445rusk.shtml
+INFO: Scraper complete. Found 15 properties.
+
+[HomeSteps] Searching: 'IL' ...
+[HomeSteps] Found 62 listings for 'IL'
+[HomeSteps] Searching: 'NC' ...
+[HomeSteps] Found 14 listings for 'NC'
+[HomeSteps] Searching: 'AZ' ...
+[HomeSteps] Found 23 listings for 'AZ'
+[HomeSteps] Searching: 'OH' ...
+[HomeSteps] Found 19 listings for 'OH'
+[HomeSteps] Searching: 'MI' ...
+[HomeSteps] Found 16 listings for 'MI'
+[HomeSteps] Searching: 'MO' ...
+[HomeSteps] Found 16 listings for 'MO'
+[HomeSteps] Total unique properties scraped: 427
+   -> 427 Freddie Mac properties
+
+============================================================
+[4/6] GSA Auctions (gsaauctions.gov)
+============================================================
+🌐 Fetching up to 200 auctions from GSA Auctions API ...
+   → Fetching batch offset=0 ...
+📋 Retrieved 1028 total auction items
+✅ Parsed 27 properties (1001 non-real-estate items skipped)
+   -> 27 GSA properties
+
+============================================================
+[5/6] Treasury/IRS Auctions (treasury.gov)
+============================================================
+   -> 15 IRS properties
+
+============================================================
+[6/6] County Records / RealtyTrac (realtytrac.com)
+============================================================
+============================================================
+County Courthouse Foreclosure Scraper
+============================================================
+
+[1/2] Scraping RealtyTrac (real county records)...
+      -> 41 unique real properties from RealtyTrac
+[2/2] Checking HUD Home Store...
+      -> 0 properties from HUD
+
+============================================================
+TOTAL: 41 real foreclosure properties scraped
+============================================================
+   -> 41 County/RealtyTrac properties
+
+======================================================================
+📊 SCRAPING COMPLETE
+======================================================================
+Total real properties scraped: 910
+
+By Source:
+   Freddie Mac HomeSteps: 427
+   Fannie Mae HomePath: 400
+   RealtyTrac / County Records: 41
+   GSA Auctions: 27
+   IRS Auctions: 15
+
+Top 10 States:
+   TX: 199
+   CA: 101
+   FL: 100
+   IL: 79
+   GA: 41
+   AZ: 35
+   NC: 31
+   KY: 30
+   OH: 29
+   MO: 28
+
+💾 Saved backup to /Users/fabiomachado/Desktop/AUCTION APART:HOUSES/Property Action/auction-flipper/scraper/real_properties_backup.json
+
+======================================================================
+🗄️  UPDATING SUPABASE DATABASE
+======================================================================
+🗑️  Clearing old fake data from Supabase...
+   ⚠️  DELETE returned 400: {"code":"21000","details":null,"hint":null,"message":"DELETE requires a WHERE clause"}
+   ⚠️  Could not clear via DELETE. Will try to upsert instead.
+📡 Pushing 910 properties to Supabase...
+   ... 50/910 inserted
+   ... 100/910 inserted
+   ... 150/910 inserted
+   ... 200/910 inserted
+   ... 250/910 inserted
+   ... 300/910 inserted
+   ... 350/910 inserted
+   ... 400/910 inserted
+   ... 450/910 inserted
+   ... 500/910 inserted
+   ... 550/910 inserted
+   ... 600/910 inserted
+   ... 650/910 inserted
+   ... 700/910 inserted
+   ... 750/910 inserted
+   ... 800/910 inserted
+   ... 850/910 inserted
+   ... 900/910 inserted
+✅ Inserted 0/910 properties
+⚠️  910 errors (showing first 5):
+   fannie-780574e6-ceb4-4de8-98c4-5a138bf82dab: 400 - {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type integer: \"180000.0\""}
+   fannie-63a7fa55-1cbe-467c-bd3c-f30ef69a2313: 400 - {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type integer: \"444900.0\""}
+   fannie-2cdf8cf6-6227-4181-845a-895bbe0942ac: 400 - {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type integer: \"320000.0\""}
+   fannie-9bbe7b2d-b583-4c37-b470-c8949358de72: 400 - {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type integer: \"80000.0\""}
+   fannie-66a1fade-d952-4094-ac4e-a552cf33d0cd: 400 - {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type integer: \"500000.0\""}
+
+======================================================================
+✅ DONE!
+======================================================================
+Real properties in database: 0
+Completed at: 2026-08-07 14:20:02
