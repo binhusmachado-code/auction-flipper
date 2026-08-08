@@ -1,0 +1,7 @@
+node_modules
+dist
+scraper/__pycache__
+scraper/*.json
+scraper/*.csv
+scraper/*.log
+*.png

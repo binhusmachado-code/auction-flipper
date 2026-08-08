@@ -1,21 +1,16 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, BarChart3, Heart, ExternalLink, Menu, X, Map as MapIcon, Scale, Bell, LogIn, LogOut, User, DollarSign } from 'lucide-react'
-import { Property, DealFilter } from './types/property'
+import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, Percent, MapPin, BookOpen, Scale, Info, Building2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Property, DealFilter, STATE_TAX_SALE_DATA } from './types/property'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useToast } from './components/ToastProvider.tsx'
 import { useSupabaseAuth, useSupabaseProperties, useSupabaseFavorites } from './hooks/useSupabase.ts'
 import { supabase } from './lib/supabase.ts'
-import Logo from './components/Logo.tsx'
 import FilterBar from './components/FilterBar'
 import PropertyCard from './components/PropertyCard'
-import DealCalculator from './components/DealCalculator'
-import AddPropertyModal from './components/AddPropertyModal'
 import MapView from './components/MapView'
-import ImageCarousel from './components/ImageCarousel.tsx'
-import ExportButton from './components/ExportButton.tsx'
-import DealComparison from './components/DealComparison.tsx'
-import AlertPreferences from './components/AlertPreferences.tsx'
 import AuthModal from './components/AuthModal.tsx'
+import BuyWizard from './components/BuyWizard.tsx'
+import { isProfitable, dealProfit } from './lib/deal.ts'
 import './index.css'
 
 function formatCurrency(n: number) {
@@ -28,29 +23,28 @@ export default function App() {
   const { properties: supabaseProperties, loading: propertiesLoading } = useSupabaseProperties()
   const { favorites: supabaseFavorites, toggleFavorite: toggleSupabaseFavorite } = useSupabaseFavorites(user?.id ?? null)
 
-  // Fallback localStorage favorites when not signed in
   const [localFavorites, setLocalFavorites] = useLocalStorage<string[]>('favorites', [])
   const favorites = user?.id ? supabaseFavorites : localFavorites
 
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
-  const [showAddModal, setShowAddModal] = useState(false)
+  const [buyProperty, setBuyProperty] = useState<Property | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
-  const [showCarousel, setShowCarousel] = useState(false)
-  const [carouselImages, setCarouselImages] = useState<string[]>([])
-  const [showComparison, setShowComparison] = useState(false)
-  const [showAlerts, setShowAlerts] = useState(false)
-  const [view, setView] = useState<'all' | 'favorites' | 'deals' | 'map'>('all')
+  const [showStateDirectory, setShowStateDirectory] = useState(false)
+  const [showEducation, setShowEducation] = useState(false)
+  const [view, setView] = useState<'all' | 'favorites' | 'map'>('all')
   const [filter, setFilter] = useState<DealFilter>({
     state: '',
     city: '',
     minPrice: 0,
-    maxPrice: 1000000,
+    maxPrice: 500000,
     propertyType: '',
+    saleType: '',
     auctionType: '',
-    minDiscount: 0,
-    maxRehab: 100000,
+    minInterestRate: 0,
+    maxRedemptionPeriod: 60,
     keyword: '',
+    profitOnly: true,
   })
 
   useEffect(() => {
@@ -59,7 +53,7 @@ export default function App() {
     }
   }, [])
 
-  const properties = supabaseProperties.length > 0 ? supabaseProperties : []
+  const properties = supabaseProperties
 
   const toggleFavorite = async (id: string) => {
     if (user?.id) {
@@ -79,72 +73,22 @@ export default function App() {
     }
   }
 
-  const handleAddProperty = async (p: Property) => {
-    const { error } = await supabase.from('properties').insert({
-      id: p.id,
-      address: p.address,
-      city: p.city,
-      state: p.state,
-      zip: p.zip,
-      price: p.price,
-      estimated_value: p.estimatedValue,
-      beds: p.beds,
-      baths: p.baths,
-      sqft: p.sqft,
-      lot_size: p.lotSize,
-      year_built: p.yearBuilt,
-      property_type: p.propertyType,
-      auction_date: p.auctionDate,
-      auction_type: p.auctionType,
-      source: p.source,
-      source_url: p.sourceUrl,
-      description: p.description,
-      image_url: p.imageUrl,
-      images: p.images,
-      status: p.status,
-      days_on_market: p.daysOnMarket,
-      rehab_estimate: p.rehabEstimate,
-      arv: p.arv,
-      notes: p.notes,
-      latitude: p.latitude,
-      longitude: p.longitude,
-      county: p.county,
-      case_number: p.caseNumber,
-      opening_bid: p.openingBid,
-      deposit_required: p.depositRequired,
-    }).select()
-    if (error) {
-      showToast('Failed to add property: ' + error.message, 'error')
-    } else {
-      showToast(`Added ${p.address}`, 'success')
-    }
-  }
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    showToast('Signed out', 'info')
-  }
-
   const filtered = useMemo(() => {
     let list = properties
     if (view === 'favorites') list = list.filter((p) => favorites.includes(p.id))
-    if (view === 'deals') list = list.filter((p) => {
-      const discount = ((p.estimatedValue - p.price) / p.estimatedValue) * 100
-      const profit = p.arv - p.price - p.rehabEstimate
-      return discount >= 30 && profit >= 30000
-    })
 
     return list.filter((p) => {
-      const discount = ((p.estimatedValue - p.price) / p.estimatedValue) * 100
-
+      if (p.status === 'Sold' || p.status === 'Cancelled') return false
+      if (filter.profitOnly && !isProfitable(p)) return false
       if (filter.state && p.state !== filter.state) return false
       if (filter.city && p.city !== filter.city) return false
       if (filter.propertyType && p.propertyType !== filter.propertyType) return false
+      if (filter.saleType && p.saleType !== filter.saleType) return false
       if (filter.auctionType && p.auctionType !== filter.auctionType) return false
       if (p.price < filter.minPrice) return false
       if (p.price > filter.maxPrice) return false
-      if (discount < filter.minDiscount) return false
-      if (p.rehabEstimate > filter.maxRehab) return false
+      if (p.interestRate < filter.minInterestRate) return false
+      if (p.redemptionPeriod > filter.maxRedemptionPeriod) return false
       if (filter.keyword) {
         const kw = filter.keyword.toLowerCase()
         const match =
@@ -152,196 +96,187 @@ export default function App() {
           p.city.toLowerCase().includes(kw) ||
           p.state.toLowerCase().includes(kw) ||
           p.description.toLowerCase().includes(kw) ||
+          (p.parcelId && p.parcelId.toLowerCase().includes(kw)) ||
           p.source.toLowerCase().includes(kw)
         if (!match) return false
       }
       return true
-    })
+    }).sort((a, b) => dealProfit(b) - dealProfit(a))
   }, [properties, favorites, view, filter])
 
-  const stats = useMemo(() => {
-    const total = filtered.length
-    const avgDiscount = total > 0
-      ? filtered.reduce((sum, p) => sum + ((p.estimatedValue - p.price) / p.estimatedValue) * 100, 0) / total
-      : 0
-    const totalProfit = filtered.reduce((sum, p) => sum + Math.max(0, p.arv - p.price - p.rehabEstimate), 0)
-    return { total, avgDiscount, totalProfit }
-  }, [filtered])
+  // Stats
+  const totalTaxOwed = filtered.reduce((s, p) => s + p.price, 0)
+  const avgInterestRate = filtered.length > 0 ? (filtered.reduce((s, p) => s + p.interestRate, 0) / filtered.length).toFixed(1) : '0'
+  const statesCount = new Set(filtered.map(p => p.state)).size
+  const lienCount = filtered.filter(p => p.saleType === 'Tax Lien').length
+  const deedCount = filtered.filter(p => p.saleType === 'Tax Deed').length
 
-  const navLink = (key: 'all' | 'favorites' | 'deals' | 'map', label: string, icon: React.ReactNode) => (
+  const navLink = (key: 'all' | 'favorites' | 'map', label: string, icon: React.ReactNode) => (
     <button
       key={key}
       onClick={() => { setView(key); setShowMobileMenu(false) }}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-        view === key ? 'bg-brand-100 text-brand-800' : 'text-gray-600 hover:bg-gray-100'
+      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
+        view === key
+          ? 'bg-emerald-500 text-zinc-950'
+          : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
       }`}
     >
       {icon}
       {label}
       {key === 'favorites' && favorites.length > 0 && (
-        <span className="ml-1 px-1.5 py-0.5 text-xs bg-red-100 text-red-700 rounded-full">{favorites.length}</span>
+        <span className="ml-0.5 px-1.5 py-0.5 text-[10px] bg-zinc-950/20 text-zinc-950 rounded-full font-bold">{favorites.length}</span>
       )}
     </button>
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Logo className="w-9 h-9" />
-              <div>
-                <h1 className="text-lg font-bold text-gray-900 leading-tight">Auction Flipper</h1>
-                <p className="text-xs text-gray-500 hidden sm:block">Find auction deals. Flip for profit.</p>
+    <div className="min-h-screen bg-zinc-950">
+      {/* Floating Nav */}
+      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-5xl">
+        <div className="glass rounded-full px-2 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 pl-3">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-zinc-950" />
               </div>
+              <span className="font-bold text-zinc-100 text-sm hidden sm:block">Tax Lien Hunter</span>
             </div>
 
-            <div className="hidden md:flex items-center gap-2">
-              {navLink('all', 'All', <Search className="w-4 h-4" />)}
-              {navLink('map', 'Map', <MapIcon className="w-4 h-4" />)}
-              {navLink('favorites', 'Saved', <Heart className="w-4 h-4" />)}
-              {navLink('deals', 'Hot Deals', <BarChart3 className="w-4 h-4" />)}
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Deal
-              </button>
+            <div className="hidden md:flex items-center gap-1">
+              {navLink('all', 'All', <Search className="w-3.5 h-3.5" />)}
+              {navLink('map', 'Map', <MapIcon className="w-3.5 h-3.5" />)}
+              {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
+            </div>
+
+            <div className="flex items-center gap-1.5">
               {user ? (
                 <button
-                  onClick={handleSignOut}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  onClick={async () => { await supabase.auth.signOut(); showToast('Signed out', 'info') }}
+                  className="px-4 py-2 text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors"
                 >
-                  <User className="w-4 h-4" />
                   Sign Out
                 </button>
               ) : (
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-brand-700 hover:bg-brand-50 rounded-lg transition-colors"
+                  className="pill-btn !px-4 !py-2 text-xs"
                 >
-                  <LogIn className="w-4 h-4" />
                   Sign In
-                </button>
-              )}
-            </div>
-
-            <div className="md:hidden flex items-center gap-2">
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="p-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-              {user ? (
-                <button
-                  onClick={handleSignOut}
-                  className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <LogOut className="w-5 h-5" />
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowAuthModal(true)}
-                  className="p-2 text-brand-700 hover:bg-brand-50 rounded-lg transition-colors"
-                >
-                  <LogIn className="w-5 h-5" />
                 </button>
               )}
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="md:hidden p-2.5 text-zinc-500 hover:text-zinc-200 transition-colors"
               >
-                {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {showMobileMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
           {showMobileMenu && (
-            <div className="md:hidden py-3 border-t border-gray-100 flex flex-col gap-2">
-              {navLink('all', 'All Properties', <Search className="w-4 h-4" />)}
-              {navLink('map', 'Map View', <MapIcon className="w-4 h-4" />)}
-              {navLink('favorites', 'Saved', <Heart className="w-4 h-4" />)}
-              {navLink('deals', 'Hot Deals', <BarChart3 className="w-4 h-4" />)}
+            <div className="md:hidden mt-2 pt-2 border-t border-zinc-800 flex flex-col gap-1 animate-fade-in">
+              {navLink('all', 'All Deals', <Search className="w-3.5 h-3.5" />)}
+              {navLink('map', 'Map View', <MapIcon className="w-3.5 h-3.5" />)}
+              {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
             </div>
           )}
         </div>
+      </nav>
+
+      {/* Hero */}
+      <header className="relative pt-32 pb-16 px-4 overflow-hidden">
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 text-emerald-400 text-[11px] font-bold uppercase tracking-[0.2em] rounded-full mb-6 border border-emerald-500/20">
+            <TrendingUp className="w-3 h-3" />
+            Government Tax Sales — Real Data
+          </div>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1] text-balance">
+            Tax Lien &<br className="hidden sm:block" /> Deed Investing
+          </h1>
+          <p className="mt-5 text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-balance">
+            We only show you homes where the numbers say you'll make money.
+            Pick one you like, tap "Buy", and we walk you through it — step by step. It's that easy.
+          </p>
+
+          {/* Stats pills */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
+            {[
+              { name: 'Tax Liens', count: lienCount, color: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
+              { name: 'Tax Deeds', count: deedCount, color: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
+              { name: 'NYC OpenData', count: properties.length, color: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
+            ].map((s) => (
+              <div
+                key={s.name}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold ring-1 ${s.color}`}
+              >
+                {s.name}
+                <span className="px-1.5 py-0.5 bg-white/10 rounded-full text-[10px]">{s.count.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                const el = document.getElementById('deals')
+                el?.scrollIntoView({ behavior: 'smooth' })
+              }}
+              className="pill-btn"
+            >
+              Browse {filtered.length.toLocaleString()} Deals
+              <span className="w-7 h-7 rounded-full bg-zinc-950/20 flex items-center justify-center">
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </span>
+            </button>
+            <button
+              onClick={() => setShowEducation(!showEducation)}
+              className="pill-btn-outline"
+            >
+              <BookOpen className="w-4 h-4" />
+              Learn
+            </button>
+          </div>
+        </div>
+
+        {/* Background glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/5 rounded-full blur-3xl -z-10" />
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Hero */}
-        <div className="mb-8 bg-brand-600 rounded-2xl p-6 sm:p-8 text-white relative overflow-hidden">
-          <div className="relative z-10">
-            <h2 className="text-2xl sm:text-3xl font-bold">Find Auction Deals. Flip for Profit.</h2>
-            <p className="mt-2 text-brand-100 text-sm sm:text-base max-w-xl">
-              Browse foreclosure, REO, and courthouse auction properties nationwide. Analyze deals with our built-in flip calculator.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/15 rounded-full text-xs font-medium backdrop-blur-sm">
-                <Search className="w-3.5 h-3.5" /> {stats.total} Properties
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/15 rounded-full text-xs font-medium backdrop-blur-sm">
-                <BarChart3 className="w-3.5 h-3.5" /> {stats.avgDiscount.toFixed(0)}% Avg Discount
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/15 rounded-full text-xs font-medium backdrop-blur-sm">
-                <DollarSign className="w-3.5 h-3.5" /> {formatCurrency(stats.totalProfit)} Potential
-              </span>
-            </div>
+      <main id="deals" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        {/* Stats row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Profitable Deals</div>
+            <div className="text-2xl font-extrabold text-white mt-1">{filtered.length.toLocaleString()}</div>
           </div>
-          <div className="absolute right-0 top-0 h-full w-1/3 bg-brand-700/30 -skew-x-12 transform origin-top-right" />
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Properties</div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</div>
+          <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Avg Interest</div>
+            <div className="text-2xl font-extrabold text-emerald-400 mt-1">{avgInterestRate}%</div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Avg Discount</div>
-            <div className="text-2xl font-bold text-brand-700 mt-1">{stats.avgDiscount.toFixed(0)}%</div>
+          <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Total Tax Owed</div>
+            <div className="text-2xl font-extrabold text-white mt-1">{formatCurrency(totalTaxOwed)}</div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Total Profit Potential</div>
-            <div className="text-2xl font-bold text-brand-700 mt-1">{formatCurrency(stats.totalProfit)}</div>
+          <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">States</div>
+            <div className="text-2xl font-extrabold text-white mt-1">{statesCount}</div>
           </div>
         </div>
 
         <FilterBar filter={filter} onChange={setFilter} />
 
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <ExportButton properties={filtered} />
-          <button
-            onClick={() => setShowComparison(true)}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-          >
-            <Scale className="w-4 h-4" />
-            Compare
-          </button>
-          <button
-            onClick={() => setShowAlerts(true)}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-          >
-            <Bell className="w-4 h-4" />
-            Alerts
-          </button>
-        </div>
-
         {propertiesLoading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="flex items-center gap-3 text-gray-500">
-              <div className="w-5 h-5 border-2 border-gray-300 border-t-brand-600 rounded-full animate-spin" />
-              <span className="text-sm font-medium">Loading properties...</span>
+          <div className="flex items-center justify-center py-20">
+            <div className="flex items-center gap-3 text-zinc-500">
+              <div className="w-5 h-5 border-2 border-zinc-700 border-t-emerald-500 rounded-full animate-spin" />
+              <span className="text-sm font-medium">Loading tax sales...</span>
             </div>
           </div>
         )}
 
         {/* Results */}
-        <div className="animate-in" key={view}>
+        <div className="animate-fade-in" key={view}>
           {view === 'map' ? (
             <MapView
               properties={filtered}
@@ -349,68 +284,183 @@ export default function App() {
               favorites={favorites}
             />
           ) : !propertiesLoading && filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="inline-flex p-4 bg-gray-100 rounded-full mb-4">
-              <Search className="w-8 h-8 text-gray-400" />
+            <div className="text-center py-24">
+              <div className="inline-flex p-5 bg-zinc-900 rounded-full mb-5">
+                <Search className="w-8 h-8 text-zinc-600" />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-100">No deals found</h3>
+              <p className="text-zinc-500 mt-2">Try adjusting your filters.</p>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">No properties found</h3>
-            <p className="text-gray-500 mt-1">Try adjusting your filters or add a new property.</p>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Property
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in">
-            {filtered.map((p) => (
-              <PropertyCard
-                key={p.id}
-                property={p}
-                onSelect={setSelectedProperty}
-                onToggleFavorite={toggleFavorite}
-                isFavorite={favorites.includes(p.id)}
-                onViewImages={(imgs) => {
-                  setCarouselImages(imgs)
-                  setShowCarousel(true)
-                }}
-              />
-            ))}
-          </div>
-        )}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {filtered.map((p) => (
+                <PropertyCard
+                  key={p.id}
+                  property={p}
+                  onSelect={setSelectedProperty}
+                  onToggleFavorite={toggleFavorite}
+                  onBuy={setBuyProperty}
+                  isFavorite={favorites.includes(p.id)}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Data Sources Info */}
-        <div className="mt-12 bg-blue-50 rounded-xl p-6">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <ExternalLink className="w-5 h-5 text-blue-700" />
+        {/* State Directory */}
+        <div className="mt-20">
+          <button
+            onClick={() => setShowStateDirectory(!showStateDirectory)}
+            className="flex items-center gap-3 mb-6"
+          >
+            <div className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800/60">
+              <MapPin className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="text-left">
+              <h3 className="font-bold text-zinc-100 text-lg">State-by-State Directory</h3>
+              <p className="text-sm text-zinc-500">Which states are Tax Lien vs Tax Deed</p>
+            </div>
+            {showStateDirectory ? <ChevronUp className="w-5 h-5 text-zinc-500" /> : <ChevronDown className="w-5 h-5 text-zinc-500" />}
+          </button>
+
+          {showStateDirectory && (
+            <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-6 animate-fade-in">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {STATE_TAX_SALE_DATA.map((s) => (
+                  <div
+                    key={s.state}
+                    className={`p-4 rounded-xl border ${
+                      s.type === 'Tax Lien'
+                        ? 'bg-emerald-500/5 border-emerald-500/10'
+                        : s.type === 'Tax Deed'
+                        ? 'bg-amber-500/5 border-amber-500/10'
+                        : 'bg-zinc-800/30 border-zinc-700/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-zinc-200">{s.state}</span>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                        s.type === 'Tax Lien'
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : s.type === 'Tax Deed'
+                          ? 'bg-amber-500/10 text-amber-400'
+                          : 'bg-zinc-700/30 text-zinc-400'
+                      }`}>
+                        {s.type}
+                      </span>
+                    </div>
+                    <div className="text-xs text-zinc-500 space-y-0.5">
+                      <div>Rate: <span className="text-zinc-300">{s.interestRate}</span></div>
+                      <div>Redemption: <span className="text-zinc-300">{s.redemptionPeriod}</span></div>
+                      {s.countiesWithData.length > 0 && (
+                        <div className="text-emerald-400 mt-1">Data available: {s.countiesWithData.join(', ')}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Education */}
+        {showEducation && (
+          <div className="mt-12 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-8 animate-fade-in">
+            <div className="flex items-start gap-4 mb-6">
+              <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
+                <Info className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-zinc-100 text-lg">Tax Lien vs Tax Deed Investing</h3>
+                <p className="text-sm text-zinc-500 mt-1">Understanding the two main strategies</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-5 bg-zinc-950/50 rounded-xl border border-zinc-800/40">
+                <div className="flex items-center gap-2 mb-3">
+                  <Percent className="w-5 h-5 text-emerald-400" />
+                  <h4 className="font-bold text-emerald-400">Tax Lien</h4>
+                </div>
+                <p className="text-sm text-zinc-400 leading-relaxed mb-3">
+                  You buy the delinquent tax debt. The property owner must pay you back 
+                  with interest (typically 12-18% annually) within a redemption period 
+                  (6 months to 3 years). You don't own the property—you own the debt.
+                </p>
+                <ul className="text-xs text-zinc-500 space-y-1">
+                  <li>• Lower capital required ($500-$50K per lien)</li>
+                  <li>• Fixed interest rate returns</li>
+                  <li>• No property management</li>
+                  <li>• Risk: owner pays, you get your money + interest back</li>
+                </ul>
+              </div>
+
+              <div className="p-5 bg-zinc-950/50 rounded-xl border border-zinc-800/40">
+                <div className="flex items-center gap-2 mb-3">
+                  <Building2 className="w-5 h-5 text-amber-400" />
+                  <h4 className="font-bold text-amber-400">Tax Deed</h4>
+                </div>
+                <p className="text-sm text-zinc-400 leading-relaxed mb-3">
+                  You buy the actual property at auction when taxes go unpaid for too long. 
+                  The previous owner loses all rights. You own the property outright and can 
+                  sell, rent, or develop it.
+                </p>
+                <ul className="text-xs text-zinc-500 space-y-1">
+                  <li>• Higher capital required (full property value)</li>
+                  <li>• Potential for large profits if property is undervalued</li>
+                  <li>• You own the real estate</li>
+                  <li>• Risk: property may have issues, need clean title</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+              <div className="flex items-start gap-3">
+                <Scale className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h5 className="font-bold text-zinc-200 text-sm">How It Works</h5>
+                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                    When property owners don't pay taxes, counties sell the debt (lien) or the property (deed) 
+                    to investors. This recovers tax revenue for the county and gives investors a chance to earn 
+                    returns secured by real estate. In lien states, if the owner doesn't pay within the redemption 
+                    period, you may be able to foreclose and get the property. In deed states, you get the property 
+                    immediately after auction.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Data Sources */}
+        <div className="mt-16 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-8">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
+              <DollarSign className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h3 className="font-semibold text-blue-900">Free Data Sources You Can Connect</h3>
-              <p className="text-sm text-blue-800 mt-1">
-                This app is pre-loaded with sample deals. To get real live data, connect these free sources:
+              <h3 className="font-bold text-zinc-100 text-lg">Data Sources</h3>
+              <p className="text-sm text-zinc-500 mt-1 max-w-2xl">
+                All properties are loaded from official government open data portals. 
+                Tax amounts are estimated based on lien status. Verify all data independently before investing.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
                 {[
-                  { name: 'HUD Home Store', url: 'https://www.hudhomestore.com', desc: 'FHA foreclosure REOs' },
-                  { name: 'Fannie Mae HomePath', url: 'https://www.homepath.com', desc: 'Fannie Mae REOs' },
-                  { name: 'Freddie Mac HomeSteps', url: 'https://www.homesteps.com', desc: 'Freddie Mac REOs' },
-                  { name: 'GSA Auctions', url: 'https://gsaauctions.gov', desc: 'Federal seized property' },
-                  { name: 'IRS Auctions', url: 'https://www.treasury.gov/auctions/irs/', desc: 'IRS seized property' },
-                  { name: 'County Courthouses', url: '#', desc: 'Local foreclosure sales' },
+                  { name: 'NYC OpenData', url: 'https://data.cityofnewyork.us/City-Government/Tax-Lien-Sale-Lists/9rz4-mjek', desc: 'NYC Tax Lien Sale Lists — 260K+ records' },
+                  { name: 'data.gov', url: 'https://catalog.data.gov/dataset?q=tax+lien', desc: 'Federal open data catalog' },
                 ].map((s) => (
                   <a
                     key={s.name}
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block bg-white rounded-lg p-3 border border-blue-200 hover:border-blue-400 transition-colors"
+                    className="block bg-zinc-950/50 rounded-2xl p-4 border border-zinc-800/40 hover:border-emerald-500/30 hover:bg-zinc-900/50 transition-all duration-300"
                   >
-                    <div className="text-sm font-medium text-blue-900">{s.name}</div>
-                    <div className="text-xs text-blue-600 mt-0.5">{s.desc}</div>
+                    <div className="text-sm font-bold text-zinc-200 flex items-center gap-1.5">
+                      {s.name}
+                      <ArrowUpRight className="w-3 h-3 text-zinc-500" />
+                    </div>
+                    <div className="text-xs text-zinc-500 mt-0.5">{s.desc}</div>
                   </a>
                 ))}
               </div>
@@ -419,24 +469,102 @@ export default function App() {
         </div>
       </main>
 
+      {/* Footer */}
+      <footer className="border-t border-zinc-800/60 py-8 px-4">
+        <div className="max-w-7xl mx-auto text-center">
+          <p className="text-xs text-zinc-600">
+            Tax Lien Hunter — Real government data for educational purposes. Not financial advice. 
+            Verify all data independently before investing. Tax lien and deed investing carries risk.
+          </p>
+        </div>
+      </footer>
+
       {/* Modals */}
       {selectedProperty && (
-        <DealCalculator property={selectedProperty} onClose={() => setSelectedProperty(null)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setSelectedProperty(null)}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white">Investment Analysis</h2>
+                <button onClick={() => setSelectedProperty(null)} className="p-2 text-zinc-500 hover:text-white transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="mb-4">
+                <h3 className="font-bold text-zinc-200">{selectedProperty.address}</h3>
+                <p className="text-sm text-zinc-500">{selectedProperty.city}, {selectedProperty.state} {selectedProperty.zip}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Tax Owed</div>
+                  <div className="text-lg font-bold text-emerald-400">{formatCurrency(selectedProperty.price)}</div>
+                </div>
+                <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Interest Rate</div>
+                  <div className="text-lg font-bold text-emerald-400">{selectedProperty.interestRate}%</div>
+                </div>
+                <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Redemption</div>
+                  <div className="text-lg font-bold text-zinc-200">{selectedProperty.redemptionPeriod} mo</div>
+                </div>
+                <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Assessed Value</div>
+                  <div className="text-lg font-bold text-zinc-200">{formatCurrency(selectedProperty.assessedValue)}</div>
+                </div>
+              </div>
+
+              {/* Projected returns */}
+              <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10 mb-4">
+                <h4 className="text-sm font-bold text-emerald-400 mb-2">Projected Returns</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Annual interest earned:</span>
+                    <span className="text-white font-bold">{formatCurrency(selectedProperty.price * selectedProperty.interestRate / 100)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Total over {selectedProperty.redemptionPeriod} months:</span>
+                    <span className="text-emerald-400 font-bold">
+                      {formatCurrency(selectedProperty.price * selectedProperty.interestRate / 100 * selectedProperty.redemptionPeriod / 12)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">ROI (annualized):</span>
+                    <span className="text-emerald-400 font-bold">{selectedProperty.interestRate}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {selectedProperty.parcelId && (
+                <div className="text-xs text-zinc-500 mb-2">
+                  Parcel ID: <span className="text-zinc-300 font-mono">{selectedProperty.parcelId}</span>
+                </div>
+              )}
+              {selectedProperty.description && (
+                <p className="text-xs text-zinc-500 leading-relaxed">{selectedProperty.description}</p>
+              )}
+              
+              <a
+                href={selectedProperty.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 w-full flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-xl transition-all"
+              >
+                View Source Data
+                <ArrowUpRight className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        </div>
       )}
-      {showAddModal && (
-        <AddPropertyModal onClose={() => setShowAddModal(false)} onAdd={handleAddProperty} />
-      )}
-      {showCarousel && (
-        <ImageCarousel images={carouselImages} onClose={() => setShowCarousel(false)} />
-      )}
-      {showComparison && (
-        <DealComparison properties={filtered} onClose={() => setShowComparison(false)} />
-      )}
-      {showAlerts && (
-        <AlertPreferences onClose={() => setShowAlerts(false)} />
-      )}
+
       {showAuthModal && (
         <AuthModal onClose={() => setShowAuthModal(false)} />
+      )}
+
+      {buyProperty && (
+        <BuyWizard property={buyProperty} onClose={() => setBuyProperty(null)} />
       )}
     </div>
   )

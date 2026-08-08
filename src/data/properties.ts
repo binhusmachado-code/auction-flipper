@@ -1,9 +1,18 @@
-import { Property } from '../types/property'
-import LIVE_PROPERTIES from './live_properties.json'
+// Static constants for filters
 
-export const SAMPLE_PROPERTIES: Property[] = LIVE_PROPERTIES as Property[]
+// Static constants for filters - populated dynamically from DB data
+export const STATES = [
+  'NY', 'FL', 'TX', 'IL', 'CA', 'AZ', 'NJ', 'MD', 'OH', 'GA',
+  'PA', 'CO', 'IN', 'IA', 'KY', 'LA', 'MA', 'MI', 'MS', 'MO',
+  'NE', 'NV', 'OK', 'SC', 'SD', 'TN', 'WV', 'WY', 'AL'
+]
 
-export const STATES = Array.from(new Set(SAMPLE_PROPERTIES.map(p => p.state))).sort()
-export const CITIES = Array.from(new Set(SAMPLE_PROPERTIES.map(p => p.city))).sort()
-export const AUCTION_TYPES = ['Foreclosure', 'Tax Lien', 'REO', 'Courthouse', 'Government', 'Estate']
+export const CITIES = [
+  'Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island',
+  'Miami', 'Tampa', 'Orlando', 'Jacksonville', 'Houston',
+  'Dallas', 'Austin', 'San Antonio', 'Chicago', 'Baltimore'
+]
+
+export const SALE_TYPES = ['Tax Lien', 'Tax Deed']
 export const PROPERTY_TYPES = ['Single Family', 'Condo', 'Townhouse', 'Multi-Family', 'Land', 'Commercial']
+export const AUCTION_TYPES = ['Tax Lien', 'Tax Deed', 'Foreclosure', 'REO', 'Courthouse', 'Government', 'Estate']
