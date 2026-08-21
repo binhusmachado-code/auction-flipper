@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, CreditCard, Loader2, Lock, Mail, X } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { openBillingPortal, startCheckout } from '../lib/billing'
+import { MEMBERSHIP_PRICING } from '../lib/pricing'
 import { useSupabaseAuth } from '../hooks/useSupabase'
 import { useMembership } from '../hooks/useMembership'
 import { useToast } from './ToastProvider'
@@ -78,8 +79,8 @@ export default function AuthModal({ onClose }: Props) {
             <button type="button" onClick={() => setYearly(true)} className={`rounded-md px-3 py-2 text-xs font-bold ${yearly ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Yearly</button>
           </div>
 
-          <div className="mt-5"><span className="text-4xl font-extrabold text-white">{yearly ? '$490' : '$49'}</span><span className="text-sm text-zinc-500">/{yearly ? 'year' : 'month'}</span></div>
-          {yearly && <div className="mt-1 text-xs font-semibold text-emerald-400">Two months included</div>}
+          <div className="mt-5"><span className="text-4xl font-extrabold text-white">${yearly ? MEMBERSHIP_PRICING.yearly : MEMBERSHIP_PRICING.monthly}</span><span className="text-sm text-zinc-500">/{yearly ? 'year' : 'month'}</span></div>
+          {yearly && <div className="mt-1 text-xs font-semibold text-emerald-400">Save ${MEMBERSHIP_PRICING.yearlySavings} per year</div>}
           <ul className="mt-6 space-y-3 text-sm text-zinc-300">
             {['Full supported-county auction inventory', 'Maximum-bid and cost scenarios', 'Saved properties, notes, and alerts', 'Beginner learning path and checklists', 'Direct links to every official source'].map((item) => <li key={item} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 flex-none text-emerald-400" />{item}</li>)}
           </ul>

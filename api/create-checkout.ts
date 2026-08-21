@@ -14,6 +14,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (!secret || !priceId) return res.status(503).json({ error: 'Membership checkout is not configured yet' })
 
     const stripe = new Stripe(secret)
+    const expectedPrice = plan === 'yearly'
+      ? { amount: 55_000, interval: 'year' }
+      : { amount: 8_900, interval: 'month' }
+    const configuredPrice = await stripe.prices.retrieve(priceId)
+    if (
+      !configuredPrice.active ||
+      configuredPrice.currency !== 'usd' ||
+      configuredPrice.unit_amount !== expectedPrice.amount ||
+      configuredPrice.recurring?.interval !== expectedPrice.interval
+    ) {
+      return res.status(503).json({ error: `The configured ${plan} Stripe price does not match the published membership price` })
+    }
+
     const admin = adminClient()
     const { data: existing } = await admin
       .from('subscriptions')

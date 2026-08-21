@@ -34,13 +34,14 @@ This is a good data prototype, but it is not ready to charge customers until acc
 
 Launch with one plan to keep the decision simple:
 
-- Standard price: $49 per month or $490 per year.
-- Private beta: 10 to 20 invited users, free or $19 for the first month in exchange for structured feedback.
-- Founding offer after beta: $39 per month locked for the first 50 paying members.
+- Standard price: $89 per month or $550 per year.
+- The annual plan saves $518 compared with twelve monthly payments.
+- Private beta: 10 to 20 invited users free in exchange for structured feedback.
+- Do not publish a separate founding discount at launch; keep the two customer choices consistent.
 - Do not charge the full standard price until the calculator, alerts, freshness monitoring, and advertised county coverage are working.
 - Do not create Basic, Pro, Team, API, or coaching tiers at launch.
 
-Comparable products currently advertise roughly $49 to $79 per month. Auction Flipper should compete on simplicity, education, transparent sources, and conservative analysis instead of promising the highest score or the biggest profit.
+Comparable products currently advertise roughly $49 to $79 per month. At $89 monthly, Auction Flipper is a premium-priced service and must earn that position through simplicity, education, transparent sources, reliable alerts, support, and conservative analysis instead of promising the highest score or the biggest profit.
 
 ## Membership And Billing
 
