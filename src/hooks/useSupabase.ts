@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase.ts'
 import { useToast } from '../components/ToastProvider.tsx'
 import type { Property } from '../types/property'
+import bundledProperties from '../data/live_properties.json'
+
+const fallbackProperties = bundledProperties as unknown as Property[]
 
 export function useSupabaseAuth() {
   const [user, setUser] = useState<any>(null)
@@ -44,9 +47,9 @@ export function useSupabaseProperties() {
       .then(({ data, error }: any) => {
         if (cancelled) return
         if (error) {
-          showToast('Failed to load properties', 'error')
-          console.error(error)
-        } else if (data) {
+          console.warn('Live property data unavailable; using bundled listings.', error)
+          setProperties(fallbackProperties)
+        } else if (data?.length) {
           const mapped: Property[] = data.map((row: Record<string, unknown>) => ({
             id: String(row.id),
             address: String(row.address),
@@ -81,6 +84,8 @@ export function useSupabaseProperties() {
             depositRequired: row.deposit_required ? Number(row.deposit_required) : undefined,
           }))
           setProperties(mapped)
+        } else {
+          setProperties(fallbackProperties)
         }
         setLoading(false)
       })
