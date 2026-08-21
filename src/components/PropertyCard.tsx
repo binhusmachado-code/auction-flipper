@@ -21,7 +21,8 @@ function formatCurrency(n: number) {
 
 function getSaleTypeColor(saleType: string) {
   if (saleType === 'Tax Lien') return 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
-  return 'bg-amber-500/10 text-amber-400 ring-amber-500/20'
+  if (saleType === 'Tax Deed') return 'bg-amber-500/10 text-amber-400 ring-amber-500/20'
+  return 'bg-sky-500/10 text-sky-400 ring-sky-500/20'
 }
 
 export default function PropertyCard({ property, onSelect, onToggleFavorite, onBuy, isFavorite }: Props) {
@@ -49,6 +50,8 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
   const profit = dealProfit(property)
   const score = dealScore(property)
   const profitable = isProfitable(property)
+  const displaySaleType = property.saleType ?? property.auctionType
+  const isTaxSale = Boolean(property.saleType)
 
   return (
     <div
@@ -61,9 +64,9 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
         {/* Header bar */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800/60">
           <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-full ring-1 ${getSaleTypeColor(property.saleType)}`}>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-full ring-1 ${getSaleTypeColor(displaySaleType)}`}>
               <Tag className="w-3 h-3" />
-              {property.saleType}
+              {displaySaleType}
             </span>
             <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
               {property.source}
@@ -108,7 +111,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
                 <DollarSign className="w-3 h-3" />
-                Tax Owed
+                {isTaxSale ? 'Tax Owed' : 'Auction Price'}
               </div>
               <div className="text-lg font-bold text-emerald-400">
                 {formatCurrency(property.price)}
@@ -117,19 +120,19 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
                 <Percent className="w-3 h-3" />
-                Interest Rate
+                {isTaxSale ? 'Interest Rate' : 'Opening Bid'}
               </div>
               <div className="text-lg font-bold text-emerald-400">
-                {property.interestRate}%
+                {isTaxSale ? `${property.interestRate}%` : formatCurrency(property.openingBid ?? property.price)}
               </div>
             </div>
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
                 <Clock className="w-3 h-3" />
-                Redemption
+                {isTaxSale ? 'Redemption' : 'Auction Date'}
               </div>
               <div className="text-lg font-bold text-zinc-200">
-                {property.redemptionPeriod} mo
+                {isTaxSale ? `${property.redemptionPeriod} mo` : (property.auctionDate || 'TBD')}
               </div>
             </div>
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">

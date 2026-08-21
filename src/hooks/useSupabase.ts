@@ -4,7 +4,65 @@ import { useToast } from '../components/ToastProvider.tsx'
 import type { Property } from '../types/property'
 import bundledProperties from '../data/live_properties.json'
 
-const fallbackProperties = bundledProperties as unknown as Property[]
+type PropertyRecord = Record<string, unknown>
+
+function optionalNumber(value: unknown): number | undefined {
+  return value === null || value === undefined || value === '' ? undefined : Number(value)
+}
+
+function normalizeProperty(row: PropertyRecord): Property {
+  const auctionType = String(row.auction_type ?? row.auctionType ?? 'Government') as Property['auctionType']
+  const rawSaleType = row.sale_type ?? row.saleType
+  const saleType = rawSaleType === 'Tax Lien' || rawSaleType === 'Tax Deed'
+    ? rawSaleType
+    : auctionType === 'Tax Lien' || auctionType === 'Tax Deed'
+      ? auctionType
+      : undefined
+
+  return {
+    id: String(row.id),
+    address: String(row.address),
+    city: String(row.city),
+    state: String(row.state),
+    zip: String(row.zip),
+    price: Number(row.price),
+    estimatedValue: Number(row.estimated_value ?? row.estimatedValue ?? 0),
+    beds: Number(row.beds ?? 0),
+    baths: Number(row.baths ?? 0),
+    sqft: Number(row.sqft ?? 0),
+    lotSize: optionalNumber(row.lot_size ?? row.lotSize),
+    yearBuilt: optionalNumber(row.year_built ?? row.yearBuilt),
+    propertyType: String(row.property_type ?? row.propertyType) as Property['propertyType'],
+    auctionDate: row.auction_date || row.auctionDate ? String(row.auction_date ?? row.auctionDate) : undefined,
+    auctionType,
+    source: String(row.source),
+    sourceUrl: String(row.source_url ?? row.sourceUrl ?? '#'),
+    description: String(row.description ?? ''),
+    imageUrl: String(row.image_url ?? row.imageUrl ?? ''),
+    images: (row.images as string[]) ?? [],
+    status: String(row.status) as Property['status'],
+    daysOnMarket: Number(row.days_on_market ?? row.daysOnMarket ?? 0),
+    rehabEstimate: Number(row.rehab_estimate ?? row.rehabEstimate ?? 0),
+    arv: Number(row.arv ?? 0),
+    notes: String(row.notes ?? ''),
+    latitude: Number(row.latitude ?? 0),
+    longitude: Number(row.longitude ?? 0),
+    county: String(row.county ?? ''),
+    caseNumber: row.case_number || row.caseNumber ? String(row.case_number ?? row.caseNumber) : undefined,
+    openingBid: optionalNumber(row.opening_bid ?? row.openingBid),
+    depositRequired: optionalNumber(row.deposit_required ?? row.depositRequired),
+    parcelId: row.parcel_id || row.parcelId ? String(row.parcel_id ?? row.parcelId) : undefined,
+    taxAmount: Number(row.tax_amount ?? row.taxAmount ?? row.price ?? 0),
+    interestRate: Number(row.interest_rate ?? row.interestRate ?? 0),
+    redemptionPeriod: Number(row.redemption_period ?? row.redemptionPeriod ?? 0),
+    saleType,
+    assessedValue: Number(row.assessed_value ?? row.assessedValue ?? row.estimated_value ?? row.estimatedValue ?? 0),
+    delinquentYears: Number(row.delinquent_years ?? row.delinquentYears ?? 0),
+    ownerName: row.owner_name || row.ownerName ? String(row.owner_name ?? row.ownerName) : undefined,
+  }
+}
+
+const fallbackProperties = (bundledProperties as PropertyRecord[]).map(normalizeProperty)
 
 export function useSupabaseAuth() {
   const [user, setUser] = useState<any>(null)
@@ -50,39 +108,7 @@ export function useSupabaseProperties() {
           console.warn('Live property data unavailable; using bundled listings.', error)
           setProperties(fallbackProperties)
         } else if (data?.length) {
-          const mapped: Property[] = data.map((row: Record<string, unknown>) => ({
-            id: String(row.id),
-            address: String(row.address),
-            city: String(row.city),
-            state: String(row.state),
-            zip: String(row.zip),
-            price: Number(row.price),
-            estimatedValue: Number(row.estimated_value),
-            beds: Number(row.beds ?? 0),
-            baths: Number(row.baths ?? 0),
-            sqft: Number(row.sqft ?? 0),
-            lotSize: row.lot_size ? Number(row.lot_size) : undefined,
-            yearBuilt: row.year_built ? Number(row.year_built) : undefined,
-            propertyType: String(row.property_type) as Property['propertyType'],
-            auctionDate: row.auction_date ? String(row.auction_date) : undefined,
-            auctionType: String(row.auction_type) as Property['auctionType'],
-            source: String(row.source),
-            sourceUrl: String(row.source_url ?? '#'),
-            description: String(row.description ?? ''),
-            imageUrl: String(row.image_url ?? ''),
-            images: (row.images as string[]) ?? [],
-            status: String(row.status) as Property['status'],
-            daysOnMarket: Number(row.days_on_market ?? 0),
-            rehabEstimate: Number(row.rehab_estimate ?? 0),
-            arv: Number(row.arv ?? 0),
-            notes: String(row.notes ?? ''),
-            latitude: Number(row.latitude ?? 0),
-            longitude: Number(row.longitude ?? 0),
-            county: String(row.county ?? ''),
-            caseNumber: row.case_number ? String(row.case_number) : undefined,
-            openingBid: row.opening_bid ? Number(row.opening_bid) : undefined,
-            depositRequired: row.deposit_required ? Number(row.deposit_required) : undefined,
-          }))
+          const mapped: Property[] = data.map(normalizeProperty)
           setProperties(mapped)
         } else {
           setProperties(fallbackProperties)

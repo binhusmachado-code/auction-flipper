@@ -35,7 +35,7 @@ export interface Property {
   taxAmount: number;
   interestRate: number;
   redemptionPeriod: number;
-  saleType: 'Tax Lien' | 'Tax Deed';
+  saleType?: 'Tax Lien' | 'Tax Deed';
   assessedValue: number;
   delinquentYears: number;
   ownerName?: string;
