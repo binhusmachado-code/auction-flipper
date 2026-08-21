@@ -121,7 +121,7 @@ export default function App() {
   const navLink = (key: 'all' | 'favorites' | 'map', label: string, icon: React.ReactNode) => (
     <button
       key={key}
-      onClick={() => { setView(key); setShowMobileMenu(false) }}
+      onClick={() => { setView(key); setShowGuide(false); setShowMobileMenu(false) }}
       className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
         view === key
           ? 'bg-emerald-500 text-zinc-950'
@@ -185,6 +185,7 @@ export default function App() {
               )}
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
+                aria-label={showMobileMenu ? 'Close navigation menu' : 'Open navigation menu'}
                 className="md:hidden p-2.5 text-zinc-500 hover:text-zinc-200 transition-colors"
               >
                 {showMobileMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
@@ -208,14 +209,13 @@ export default function App() {
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 text-emerald-400 text-[11px] font-bold uppercase tracking-[0.2em] rounded-full mb-6 border border-emerald-500/20">
             <TrendingUp className="w-3 h-3" />
-            Government Tax Sales — Real Data
+            Official & Aggregated Auction Leads
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1] text-balance">
             Tax Lien &<br className="hidden sm:block" /> Deed Investing
           </h1>
           <p className="mt-5 text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-balance">
-            We only show you homes where the numbers say you'll make money.
-            Pick one you like, tap "Buy", and we walk you through it — step by step. It's that easy.
+            Review tax-sale opportunities, compare the numbers, and open the official auction source before you bid.
           </p>
 
           {/* Stats pills */}
@@ -223,7 +223,7 @@ export default function App() {
             {[
               { name: 'Tax Liens', count: lienCount, color: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
               { name: 'Tax Deeds', count: deedCount, color: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
-              { name: 'NYC OpenData', count: properties.length, color: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
+              { name: 'All Listings', count: properties.length, color: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
             ].map((s) => (
               <div
                 key={s.name}
@@ -331,16 +331,16 @@ export default function App() {
         <div className="mt-20">
           <button
             onClick={() => setShowStateDirectory(!showStateDirectory)}
-            className="flex items-center gap-3 mb-6"
+            className="flex w-full min-w-0 items-center gap-3 mb-6"
           >
             <div className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800/60">
               <MapPin className="w-5 h-5 text-emerald-400" />
             </div>
-            <div className="text-left">
-              <h3 className="font-bold text-zinc-100 text-lg">State-by-State Directory</h3>
+            <div className="min-w-0 flex-1 text-left">
+              <h3 className="font-bold text-zinc-100 text-base sm:text-lg break-words">State-by-State Directory</h3>
               <p className="text-sm text-zinc-500">Which states are Tax Lien vs Tax Deed</p>
             </div>
-            {showStateDirectory ? <ChevronUp className="w-5 h-5 text-zinc-500" /> : <ChevronDown className="w-5 h-5 text-zinc-500" />}
+            {showStateDirectory ? <ChevronUp className="w-5 h-5 flex-shrink-0 text-zinc-500" /> : <ChevronDown className="w-5 h-5 flex-shrink-0 text-zinc-500" />}
           </button>
 
           {showStateDirectory && (
@@ -385,19 +385,20 @@ export default function App() {
 
         {/* Data Sources */}
         <div className="mt-16 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-8">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col items-start gap-4 sm:flex-row">
             <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
               <DollarSign className="w-5 h-5 text-emerald-400" />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <h3 className="font-bold text-zinc-100 text-lg">Data Sources</h3>
               <p className="text-sm text-zinc-500 mt-1 max-w-2xl">
-                All properties are loaded from official government open data portals. 
-                Tax amounts are estimated based on lien status. Verify all data independently before investing.
+                Broward tax deeds and NYC lien records link to their official sources. Other aggregated auction leads may be incomplete.
+                Always verify the current county file, title, liens, condition, and bid amount independently.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
                 {[
                   { name: 'NYC OpenData', url: 'https://data.cityofnewyork.us/City-Government/Tax-Lien-Sale-Lists/9rz4-mjek', desc: 'NYC Tax Lien Sale Lists — 260K+ records' },
+                  { name: 'Broward Tax Deeds', url: 'https://broward.deedauction.net/auctions', desc: 'Official upcoming Broward County tax deed auctions' },
                   { name: 'data.gov', url: 'https://catalog.data.gov/dataset?q=tax+lien', desc: 'Federal open data catalog' },
                 ].map((s) => (
                   <a
@@ -424,8 +425,8 @@ export default function App() {
       <footer className="border-t border-zinc-800/60 py-8 px-4">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-xs text-zinc-600">
-            Tax Lien Hunter — Real government data for educational purposes. Not financial advice. 
-            Verify all data independently before investing. Tax lien and deed investing carries risk.
+            Tax Lien Hunter — Auction research for educational purposes, not legal or financial advice.
+            Verify every listing with the government auction source before investing.
           </p>
         </div>
       </footer>
@@ -437,7 +438,7 @@ export default function App() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-white">Investment Analysis</h2>
-                <button onClick={() => setSelectedProperty(null)} className="p-2 text-zinc-500 hover:text-white transition-colors">
+                <button aria-label="Close analysis" onClick={() => setSelectedProperty(null)} className="p-2 text-zinc-500 hover:text-white transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -455,12 +456,20 @@ export default function App() {
                   <div className="text-lg font-bold text-emerald-400">{formatCurrency(selectedProperty.price)}</div>
                 </div>
                 <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Interest Rate</div>
-                  <div className="text-lg font-bold text-emerald-400">{selectedProperty.interestRate}%</div>
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                    {selectedProperty.saleType === 'Tax Lien' ? 'Interest Rate' : 'Auction Date'}
+                  </div>
+                  <div className="text-lg font-bold text-emerald-400">
+                    {selectedProperty.saleType === 'Tax Lien' ? `${selectedProperty.interestRate}%` : (selectedProperty.auctionDate || 'TBD')}
+                  </div>
                 </div>
                 <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Redemption</div>
-                  <div className="text-lg font-bold text-zinc-200">{selectedProperty.redemptionPeriod} mo</div>
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                    {selectedProperty.saleType === 'Tax Lien' ? 'Redemption' : 'Required Deposit'}
+                  </div>
+                  <div className="text-lg font-bold text-zinc-200">
+                    {selectedProperty.saleType === 'Tax Lien' ? `${selectedProperty.redemptionPeriod} mo` : formatCurrency(selectedProperty.depositRequired ?? 0)}
+                  </div>
                 </div>
                 <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
                   <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Assessed Value</div>
@@ -469,7 +478,7 @@ export default function App() {
               </div>
 
               {/* Projected returns */}
-              <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10 mb-4">
+              {selectedProperty.saleType === 'Tax Lien' ? <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10 mb-4">
                 <h4 className="text-sm font-bold text-emerald-400 mb-2">Projected Returns</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -487,7 +496,12 @@ export default function App() {
                     <span className="text-emerald-400 font-bold">{selectedProperty.interestRate}%</span>
                   </div>
                 </div>
-              </div>
+              </div> : <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/20 mb-4">
+                <h4 className="text-sm font-bold text-amber-400 mb-1">Due diligence required</h4>
+                <p className="text-xs leading-relaxed text-zinc-400">
+                  The assessed value is not a resale estimate. Check title, surviving liens, occupancy, land use, condition, and the current county auction file before bidding.
+                </p>
+              </div>}
 
               {selectedProperty.parcelId && (
                 <div className="text-xs text-zinc-500 mb-2">

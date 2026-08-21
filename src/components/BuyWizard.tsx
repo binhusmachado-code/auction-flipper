@@ -117,7 +117,7 @@ export default function BuyWizard({ property, userId = null, onClose, onOpenGuid
         <div className="sticky top-0 bg-zinc-900/95 backdrop-blur border-b border-zinc-800 px-6 pt-5 pb-4 z-10">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-extrabold text-white">Buy This Property</h2>
-            <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white transition-colors">
+            <button aria-label="Close purchase" onClick={onClose} className="p-2 text-zinc-500 hover:text-white transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -163,27 +163,29 @@ export default function BuyWizard({ property, userId = null, onClose, onOpenGuid
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className={`grid gap-3 text-center ${property.valuationVerified === false ? 'grid-cols-2' : 'grid-cols-3'}`}>
                 <div className="bg-zinc-950 rounded-xl p-4 border border-zinc-800">
                   <div className="text-[11px] text-zinc-500 font-bold uppercase">You Pay</div>
                   <div className="text-xl font-extrabold text-white mt-1">{formatMoney(cost)}</div>
                 </div>
                 <div className="bg-zinc-950 rounded-xl p-4 border border-zinc-800">
                   <div className="text-[11px] text-zinc-500 font-bold uppercase">It's Worth</div>
-                  <div className="text-xl font-extrabold text-white mt-1">{formatMoney(value)}</div>
+                  <div className="text-xl font-extrabold text-white mt-1">{property.valuationVerified === false ? 'Unknown' : formatMoney(value)}</div>
                 </div>
-                <div className="bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/30">
+                {property.valuationVerified !== false && <div className="bg-emerald-500/10 rounded-xl p-4 border border-emerald-500/30">
                   <div className="text-[11px] text-emerald-500 font-bold uppercase">You Could Make</div>
                   <div className="text-xl font-extrabold text-emerald-400 mt-1">{formatMoney(profit)}</div>
-                </div>
+                </div>}
               </div>
 
-              <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 text-sm text-zinc-300 leading-relaxed">
+              {property.valuationVerified === false ? <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 text-sm text-zinc-300 leading-relaxed">
+                <strong className="text-amber-400">Research before bidding.</strong> The county assessed value is not a market valuation. Verify title, liens, occupancy, condition, and resale value independently.
+              </div> : <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-4 text-sm text-zinc-300 leading-relaxed">
                 💡 <strong className="text-emerald-400">In plain words:</strong> you buy this for{' '}
                 <strong>{formatMoney(cost)}</strong>, and similar homes sell for about{' '}
                 <strong>{formatMoney(value)}</strong>. That's about{' '}
                 <strong className="text-emerald-400">{roi.toFixed(0)}% return</strong> on your money.
-              </div>
+              </div>}
 
               {onOpenGuide && (
                 <button
@@ -207,8 +209,9 @@ export default function BuyWizard({ property, userId = null, onClose, onOpenGuid
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-400 mb-1.5">Your full name</label>
+                  <label htmlFor="buyer-name" className="block text-xs font-bold text-zinc-400 mb-1.5">Your full name</label>
                   <input
+                    id="buyer-name"
                     type="text"
                     value={buyer.fullName}
                     onChange={(e) => setBuyer({ ...buyer, fullName: e.target.value })}
@@ -217,8 +220,9 @@ export default function BuyWizard({ property, userId = null, onClose, onOpenGuid
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-400 mb-1.5">Your email</label>
+                  <label htmlFor="buyer-email" className="block text-xs font-bold text-zinc-400 mb-1.5">Your email</label>
                   <input
+                    id="buyer-email"
                     type="email"
                     value={buyer.email}
                     onChange={(e) => setBuyer({ ...buyer, email: e.target.value })}
@@ -227,8 +231,9 @@ export default function BuyWizard({ property, userId = null, onClose, onOpenGuid
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-400 mb-1.5">Phone (optional)</label>
+                  <label htmlFor="buyer-phone" className="block text-xs font-bold text-zinc-400 mb-1.5">Phone (optional)</label>
                   <input
+                    id="buyer-phone"
                     type="tel"
                     value={buyer.phone}
                     onChange={(e) => setBuyer({ ...buyer, phone: e.target.value })}

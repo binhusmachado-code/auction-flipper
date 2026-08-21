@@ -72,6 +72,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
             </span>
           </div>
           <button
+            aria-label={isFavorite ? `Remove ${property.address} from saved properties` : `Save ${property.address}`}
             onClick={(e) => {
               e.stopPropagation()
               onToggleFavorite(property.id)
@@ -200,13 +201,25 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
                 <ArrowUpRight className="w-4 h-4" />
               </span>
             </button>
-            <button
-              onClick={() => onBuy(property)}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-xl transition-all duration-300 active:scale-[0.98]"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              Buy — Easy Steps
-            </button>
+            {property.valuationVerified === false ? (
+              <a
+                href={property.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-xl transition-all duration-300 active:scale-[0.98]"
+              >
+                Official Auction
+                <ArrowUpRight className="w-4 h-4" />
+              </a>
+            ) : (
+              <button
+                onClick={() => onBuy(property)}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-xl transition-all duration-300 active:scale-[0.98]"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                Buy — Easy Steps
+              </button>
+            )}
           </div>
         </div>
       </div>
