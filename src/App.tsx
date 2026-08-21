@@ -267,7 +267,7 @@ export default function App() {
         {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Profitable Deals</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Active Listings</div>
             <div className="text-2xl font-extrabold text-white mt-1">{filtered.length.toLocaleString()}</div>
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
