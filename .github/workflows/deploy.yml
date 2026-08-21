@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '17 10 * * *'
 
 permissions:
   contents: read
@@ -27,6 +29,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Refresh official tax deed listings
+        run: |
+          python -m pip install requests beautifulsoup4
+          python scraper/tax_deed/broward_tax_deed.py
       - name: Build
         run: npm run build
       - name: Setup Pages

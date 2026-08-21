@@ -11,7 +11,7 @@ import MapView from './components/MapView'
 import AuthModal from './components/AuthModal.tsx'
 import BuyWizard from './components/BuyWizard.tsx'
 import Guide from './components/Guide.tsx'
-import { isProfitable, dealProfit } from './lib/deal.ts'
+import { isProfitable, dealProfit, marketValue } from './lib/deal.ts'
 import './index.css'
 
 function formatCurrency(n: number) {
@@ -86,7 +86,7 @@ export default function App() {
 
     return list.filter((p) => {
       if (p.status === 'Sold' || p.status === 'Cancelled') return false
-      if (filter.profitOnly && !isProfitable(p)) return false
+      if (filter.profitOnly && marketValue(p) > 0 && !isProfitable(p)) return false
       if (filter.state && p.state !== filter.state) return false
       if (filter.city && p.city !== filter.city) return false
       if (filter.propertyType && p.propertyType !== filter.propertyType) return false
@@ -275,7 +275,7 @@ export default function App() {
             <div className="text-2xl font-extrabold text-emerald-400 mt-1">{avgInterestRate}%</div>
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Total Tax Owed</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Total Listed Amount</div>
             <div className="text-2xl font-extrabold text-white mt-1">{formatCurrency(totalTaxOwed)}</div>
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
@@ -449,7 +449,9 @@ export default function App() {
 
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Tax Owed</div>
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                    {selectedProperty.saleType === 'Tax Lien' ? 'Tax Owed' : 'Opening Bid'}
+                  </div>
                   <div className="text-lg font-bold text-emerald-400">{formatCurrency(selectedProperty.price)}</div>
                 </div>
                 <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">

@@ -11,7 +11,7 @@ export interface Property {
   sqft: number;
   lotSize?: number;
   yearBuilt?: number;
-  propertyType: 'Single Family' | 'Condo' | 'Townhouse' | 'Multi-Family' | 'Land' | 'Commercial';
+  propertyType: 'Single Family' | 'Condo' | 'Townhouse' | 'Multi-Family' | 'Land' | 'Commercial' | 'Unknown';
   auctionDate?: string;
   auctionType: 'Tax Lien' | 'Tax Deed' | 'Foreclosure' | 'REO' | 'Courthouse' | 'Government' | 'Estate';
   source: string;
@@ -39,6 +39,7 @@ export interface Property {
   assessedValue: number;
   delinquentYears: number;
   ownerName?: string;
+  valuationVerified?: boolean;
   waterDebtOnly?: string;
   borough?: string;
   block?: string;

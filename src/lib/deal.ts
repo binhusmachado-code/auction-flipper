@@ -5,6 +5,7 @@ import type { Property } from '../types/property'
  * Falls back through the value fields the different scrapers provide.
  */
 export function marketValue(p: Property): number {
+  if (p.valuationVerified === false) return 0
   return p.arv || p.estimatedValue || p.assessedValue || 0
 }
 

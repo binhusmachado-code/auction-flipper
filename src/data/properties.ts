@@ -14,5 +14,5 @@ export const CITIES = [
 ]
 
 export const SALE_TYPES = ['Tax Lien', 'Tax Deed']
-export const PROPERTY_TYPES = ['Single Family', 'Condo', 'Townhouse', 'Multi-Family', 'Land', 'Commercial']
+export const PROPERTY_TYPES = ['Single Family', 'Condo', 'Townhouse', 'Multi-Family', 'Land', 'Commercial', 'Unknown']
 export const AUCTION_TYPES = ['Tax Lien', 'Tax Deed', 'Foreclosure', 'REO', 'Courthouse', 'Government', 'Estate']

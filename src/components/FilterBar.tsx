@@ -160,7 +160,7 @@ export default function FilterBar({ filter, onChange }: Props) {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Max Tax Owed</label>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Max Bid / Tax Owed</label>
             <select
               value={filter.maxPrice < 500000 ? filter.maxPrice : 500000}
               onChange={(e) => update({ maxPrice: Number(e.target.value) || 500000 })}

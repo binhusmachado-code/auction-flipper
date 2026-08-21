@@ -51,7 +51,6 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
   const score = dealScore(property)
   const profitable = isProfitable(property)
   const displaySaleType = property.saleType ?? property.auctionType
-  const isTaxSale = Boolean(property.saleType)
 
   return (
     <div
@@ -111,7 +110,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
                 <DollarSign className="w-3 h-3" />
-                {isTaxSale ? 'Tax Owed' : 'Auction Price'}
+                {property.saleType === 'Tax Lien' ? 'Tax Owed' : 'Opening Bid'}
               </div>
               <div className="text-lg font-bold text-emerald-400">
                 {formatCurrency(property.price)}
@@ -120,19 +119,19 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
                 <Percent className="w-3 h-3" />
-                {isTaxSale ? 'Interest Rate' : 'Opening Bid'}
+                {property.saleType === 'Tax Lien' ? 'Interest Rate' : 'Opening Bid'}
               </div>
               <div className="text-lg font-bold text-emerald-400">
-                {isTaxSale ? `${property.interestRate}%` : formatCurrency(property.openingBid ?? property.price)}
+                {property.saleType === 'Tax Lien' ? `${property.interestRate}%` : formatCurrency(property.openingBid ?? property.price)}
               </div>
             </div>
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
                 <Clock className="w-3 h-3" />
-                {isTaxSale ? 'Redemption' : 'Auction Date'}
+                {property.saleType === 'Tax Lien' ? 'Redemption' : 'Auction Date'}
               </div>
               <div className="text-lg font-bold text-zinc-200">
-                {isTaxSale ? `${property.redemptionPeriod} mo` : (property.auctionDate || 'TBD')}
+                {property.saleType === 'Tax Lien' ? `${property.redemptionPeriod} mo` : (property.auctionDate || 'TBD')}
               </div>
             </div>
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
@@ -149,7 +148,11 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
           {/* Deal summary */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3 flex-wrap">
-              {profitable ? (
+              {property.valuationVerified === false ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-400 text-xs font-bold rounded-lg border border-amber-500/20">
+                  Needs due diligence
+                </span>
+              ) : profitable ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/20">
                   <Sparkles className="w-3 h-3" />
                   Est. Profit {formatCurrency(profit)}

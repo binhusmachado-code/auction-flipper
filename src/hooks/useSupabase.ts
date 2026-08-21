@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.ts'
 import { useToast } from '../components/ToastProvider.tsx'
 import type { Property } from '../types/property'
 import bundledProperties from '../data/live_properties.json'
+import taxDeedProperties from '../data/tax_deed_properties.json'
 
 type PropertyRecord = Record<string, unknown>
 
@@ -32,7 +33,7 @@ function normalizeProperty(row: PropertyRecord): Property {
     sqft: Number(row.sqft ?? 0),
     lotSize: optionalNumber(row.lot_size ?? row.lotSize),
     yearBuilt: optionalNumber(row.year_built ?? row.yearBuilt),
-    propertyType: String(row.property_type ?? row.propertyType) as Property['propertyType'],
+    propertyType: String(row.property_type ?? row.propertyType ?? 'Unknown') as Property['propertyType'],
     auctionDate: row.auction_date || row.auctionDate ? String(row.auction_date ?? row.auctionDate) : undefined,
     auctionType,
     source: String(row.source),
@@ -59,10 +60,11 @@ function normalizeProperty(row: PropertyRecord): Property {
     assessedValue: Number(row.assessed_value ?? row.assessedValue ?? row.estimated_value ?? row.estimatedValue ?? 0),
     delinquentYears: Number(row.delinquent_years ?? row.delinquentYears ?? 0),
     ownerName: row.owner_name || row.ownerName ? String(row.owner_name ?? row.ownerName) : undefined,
+    valuationVerified: row.valuation_verified === false || row.valuationVerified === false ? false : undefined,
   }
 }
 
-const fallbackProperties = (bundledProperties as PropertyRecord[]).map(normalizeProperty)
+const fallbackProperties = ([...taxDeedProperties, ...bundledProperties] as PropertyRecord[]).map(normalizeProperty)
 
 export function useSupabaseAuth() {
   const [user, setUser] = useState<any>(null)
