@@ -120,10 +120,10 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
                 <Percent className="w-3 h-3" />
-                {property.saleType === 'Tax Lien' ? 'Interest Rate' : 'Opening Bid'}
+                {property.saleType === 'Tax Lien' ? 'Interest Rate' : 'Required Deposit'}
               </div>
               <div className="text-lg font-bold text-emerald-400">
-                {property.saleType === 'Tax Lien' ? `${property.interestRate}%` : formatCurrency(property.openingBid ?? property.price)}
+                {property.saleType === 'Tax Lien' ? `${property.interestRate}%` : formatCurrency(property.depositRequired ?? 0)}
               </div>
             </div>
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
