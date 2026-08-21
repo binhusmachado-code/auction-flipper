@@ -40,9 +40,103 @@ HEADERS = {
     "Connection": "keep-alive",
 }
 
+STREET_SUFFIXES = {
+    "aly", "ave", "blvd", "cir", "ct", "court", "dr", "drive", "hwy",
+    "lane", "ln", "pkwy", "pl", "place", "rd", "road", "st", "street",
+    "ter", "trl", "trail", "way",
+}
+UNIT_MARKERS = {"apt", "bldg", "lot", "ste", "suite", "unit"}
+DIRECTIONS = {"n", "ne", "e", "se", "s", "sw", "w", "nw"}
+
 
 class FreddieScraperError(Exception):
     pass
+
+
+def _is_real_estate_listing(data: Dict) -> bool:
+    listing_type = data.get("@type")
+    if isinstance(listing_type, str):
+        return listing_type == "RealEstateListing"
+    return isinstance(listing_type, list) and "RealEstateListing" in listing_type
+
+
+def _format_location_parts(parts: List[str]) -> str:
+    formatted = []
+    for part in parts:
+        lower = part.lower()
+        if lower in DIRECTIONS:
+            formatted.append(lower.upper())
+        elif re.fullmatch(r"\d+(?:st|nd|rd|th)", lower):
+            formatted.append(lower)
+        else:
+            formatted.append(lower.title())
+    return " ".join(formatted)
+
+
+def _parse_location_from_url(listing_url: str) -> Optional[Dict[str, str]]:
+    """Recover a HomeSteps address from its canonical listing URL."""
+    slug = urlparse(listing_url).path.rstrip("/").split("/")[-1]
+    parts = [part for part in slug.split("-") if part]
+    if len(parts) < 5 or not re.fullmatch(r"\d{5}(?:\d{4})?", parts[-1]):
+        return None
+
+    zip_code = parts.pop()
+    state = parts.pop().upper()
+    suffix_index = next(
+        (index for index, part in enumerate(parts) if part.lower() in STREET_SUFFIXES),
+        None,
+    )
+    if suffix_index is None:
+        return None
+
+    address_end = suffix_index + 1
+    while address_end < len(parts) and parts[address_end].lower() in STREET_SUFFIXES:
+        address_end += 1
+    if address_end < len(parts) and parts[address_end].lower() in DIRECTIONS:
+        address_end += 1
+    if address_end < len(parts) and parts[address_end].lower() in UNIT_MARKERS:
+        address_end += 2
+    elif address_end < len(parts) and parts[address_end].isdigit():
+        address_end += 1
+
+    street_parts = parts[:address_end]
+    city_parts = parts[address_end:]
+    if not street_parts or not city_parts:
+        return None
+
+    return {
+        "address": _format_location_parts(street_parts),
+        "city": _format_location_parts(city_parts),
+        "state": state,
+        "zip": zip_code,
+    }
+
+
+def _minimal_listing_from_url(listing_url: str) -> Optional[Dict]:
+    location = _parse_location_from_url(listing_url)
+    if not location:
+        return None
+
+    slug = urlparse(listing_url).path.rstrip("/").split("/")[-1]
+    return {
+        "id": f"freddie-{slug.replace('-', '_')}",
+        **location,
+        "price": None,
+        "estimated_value": None,
+        "beds": None,
+        "baths": None,
+        "sqft": None,
+        "property_type": "Single Family",
+        "auction_date": None,
+        "auction_type": "REO",
+        "source": "Freddie Mac HomeSteps",
+        "source_url": listing_url,
+        "description": "",
+        "image_url": None,
+        "status": None,
+        "latitude": None,
+        "longitude": None,
+    }
 
 
 def _parse_search_results(html: str) -> tuple:
@@ -119,9 +213,9 @@ def _extract_json_ld(html: str) -> Optional[Dict]:
                 # Could be @graph array or direct object
                 if "@graph" in data:
                     for item in data["@graph"]:
-                        if isinstance(item, dict) and item.get("@type") == ["RealEstateListing"]:
+                        if isinstance(item, dict) and _is_real_estate_listing(item):
                             return item
-                elif data.get("@type") == ["RealEstateListing"]:
+                elif _is_real_estate_listing(data):
                     return data
         except (json.JSONDecodeError, TypeError):
             continue
@@ -276,20 +370,33 @@ def search_listings(query: str = "FL", session: Optional[requests.Session] = Non
     return all_listings
 
 
-def fetch_listing_detail(listing_url: str, session: Optional[requests.Session] = None, delay: float = 1.0) -> Optional[Dict]:
+def fetch_listing_detail(
+    listing_url: str,
+    session: Optional[requests.Session] = None,
+    delay: float = 1.0,
+    max_attempts: int = 3,
+) -> Optional[Dict]:
     """Fetch and parse a single listing detail page."""
     if session is None:
         session = requests.Session()
         session.headers.update(HEADERS)
 
-    try:
-        resp = session.get(listing_url, timeout=30)
-        resp.raise_for_status()
-    except requests.RequestException as e:
-        print(f"Warning: Failed to fetch {listing_url}: {e}")
-        return None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            resp = session.get(listing_url, timeout=30)
+            resp.raise_for_status()
+            detail = _parse_listing_detail(resp.text, listing_url)
+            if detail and detail.get("address"):
+                return detail
+            error = "missing listing JSON-LD or address"
+        except requests.RequestException as exc:
+            error = str(exc)
 
-    return _parse_listing_detail(resp.text, listing_url)
+        if attempt < max_attempts:
+            time.sleep(delay * attempt)
+
+    print(f"Warning: Failed to parse {listing_url} after {max_attempts} attempts: {error}")
+    return _minimal_listing_from_url(listing_url)
 
 
 def scrape_homesteps(search_queries: Optional[List[str]] = None, delay: float = 1.0) -> List[Dict]:
@@ -347,31 +454,7 @@ def scrape_homesteps(search_queries: Optional[List[str]] = None, delay: float = 
                     detail["status"] = listing["status"]
                 all_results.append(detail)
             else:
-                # Fallback: create minimal record from search data
-                slug = urlparse(url).path.strip("/").split("/")[-1]
-                unique_id = slug.replace("listingdetails/", "").replace("-", "_")
-                all_results.append({
-                    "id": f"freddie-{unique_id}",
-                    "address": None,
-                    "city": None,
-                    "state": None,
-                    "zip": None,
-                    "price": int(listing["price"]) if listing.get("price") else None,
-                    "estimated_value": None,
-                    "beds": None,
-                    "baths": None,
-                    "sqft": None,
-                    "property_type": "Single Family",
-                    "auction_date": None,
-                    "auction_type": "REO",
-                    "source": "Freddie Mac HomeSteps",
-                    "source_url": url,
-                    "description": "",
-                    "image_url": None,
-                    "status": listing.get("status", "Unknown"),
-                    "latitude": None,
-                    "longitude": None,
-                })
+                print(f"[HomeSteps] Skipping incomplete listing: {url}")
 
         time.sleep(delay)
 
