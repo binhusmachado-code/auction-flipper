@@ -19,7 +19,7 @@ export interface Property {
   description: string;
   imageUrl: string;
   images: string[];
-  status: 'Active' | 'Pending' | 'Sold' | 'Cancelled';
+  status: 'Active' | 'Pending' | 'Sold' | 'Cancelled' | 'Removed';
   daysOnMarket: number;
   rehabEstimate: number;
   arv: number;
@@ -50,6 +50,7 @@ export interface Property {
 
 export interface DealFilter {
   state: string;
+  county: string;
   city: string;
   minPrice: number;
   maxPrice: number;
@@ -60,6 +61,7 @@ export interface DealFilter {
   maxRedemptionPeriod: number;
   keyword: string;
   profitOnly: boolean;
+  sortBy: 'auction-soonest' | 'price-low' | 'price-high' | 'assessed-high' | 'deal';
 }
 
 export interface FlipAnalysis {
@@ -89,7 +91,7 @@ export const STATE_TAX_SALE_DATA: StateTaxSaleInfo[] = [
   { state: 'Arizona', type: 'Tax Lien', interestRate: '16%', redemptionPeriod: '3 years', notes: 'One of the highest interest rates', countiesWithData: [] },
   { state: 'California', type: 'Hybrid', interestRate: 'Varies', redemptionPeriod: '5 years', notes: 'Deed states with some lien sales', countiesWithData: [] },
   { state: 'Colorado', type: 'Tax Lien', interestRate: '9% + 3% penalty', redemptionPeriod: '3 years', notes: 'Sold via public auction', countiesWithData: [] },
-  { state: 'Florida', type: 'Tax Deed', interestRate: '18% max', redemptionPeriod: 'N/A', notes: 'Most active tax deed state. High volume.', countiesWithData: ['Miami-Dade', 'Broward', 'Palm Beach', 'Orange', 'Hillsborough'] },
+  { state: 'Florida', type: 'Tax Deed', interestRate: '18% max', redemptionPeriod: 'N/A', notes: 'Most active tax deed state. High volume.', countiesWithData: ['Broward', 'Brevard', 'Suwannee', 'Gulf'] },
   { state: 'Georgia', type: 'Hybrid', interestRate: '20% / $0.50 per $1', redemptionPeriod: '1 year', notes: 'One-year redemption, then deed', countiesWithData: [] },
   { state: 'Illinois', type: 'Tax Lien', interestRate: '18% / 1.5% per month', redemptionPeriod: '2-3 years', notes: 'Cook County has huge volume', countiesWithData: ['Cook'] },
   { state: 'Indiana', type: 'Tax Lien', interestRate: '10-15%', redemptionPeriod: '1 year', notes: 'Short redemption period', countiesWithData: [] },

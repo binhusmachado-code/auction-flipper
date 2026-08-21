@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { MapPin, Heart, ArrowUpRight, Tag, Percent, Clock, DollarSign, FileText, Building, Sparkles, ShoppingCart } from 'lucide-react'
+import { MapPin, Heart, ArrowUpRight, Tag, Percent, Clock, DollarSign, FileText, Building, Sparkles } from 'lucide-react'
 import { Property } from '../types/property'
 import { dealProfit, dealScore, isProfitable } from '../lib/deal'
+import PropertyMedia from './PropertyMedia'
 
 interface Props {
   property: Property
   onSelect: (p: Property) => void
   onToggleFavorite: (id: string) => void
-  onBuy: (p: Property) => void
   isFavorite: boolean
 }
 
@@ -25,7 +25,7 @@ function getSaleTypeColor(saleType: string) {
   return 'bg-sky-500/10 text-sky-400 ring-sky-500/20'
 }
 
-export default function PropertyCard({ property, onSelect, onToggleFavorite, onBuy, isFavorite }: Props) {
+export default function PropertyCard({ property, onSelect, onToggleFavorite, isFavorite }: Props) {
   const [isVisible, setIsVisible] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -61,13 +61,13 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
     >
       <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl overflow-hidden hover:border-zinc-700/80 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5">
         {/* Header bar */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800/60">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-zinc-800/60">
+          <div className="flex min-w-0 items-center gap-2">
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-full ring-1 ${getSaleTypeColor(displaySaleType)}`}>
               <Tag className="w-3 h-3" />
               {displaySaleType}
             </span>
-            <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
+            <span className="truncate text-[11px] font-medium text-zinc-500 uppercase tracking-wider">
               {property.source}
             </span>
           </div>
@@ -86,6 +86,8 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
             <Heart className={`w-4 h-4 ${isFavorite ? 'fill-emerald-400' : ''}`} />
           </button>
         </div>
+
+        <PropertyMedia property={property} />
 
         {/* Main content */}
         <div className="p-5">
@@ -120,7 +122,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
                 <Percent className="w-3 h-3" />
-                {property.saleType === 'Tax Lien' ? 'Interest Rate' : 'Required Deposit'}
+                {property.saleType === 'Tax Lien' ? 'Interest Rate' : 'Est. Min. Deposit'}
               </div>
               <div className="text-lg font-bold text-emerald-400">
                 {property.saleType === 'Tax Lien' ? `${property.interestRate}%` : formatCurrency(property.depositRequired ?? 0)}
@@ -196,30 +198,20 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, onB
               onClick={() => onSelect(property)}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold rounded-xl transition-all duration-300 active:scale-[0.98] group/btn"
             >
-              Analyze
+              Research
               <span className="transition-transform duration-300 group-hover/btn:translate-x-0.5">
                 <ArrowUpRight className="w-4 h-4" />
               </span>
             </button>
-            {property.valuationVerified === false ? (
-              <a
-                href={property.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-xl transition-all duration-300 active:scale-[0.98]"
-              >
-                Official Auction
-                <ArrowUpRight className="w-4 h-4" />
-              </a>
-            ) : (
-              <button
-                onClick={() => onBuy(property)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-xl transition-all duration-300 active:scale-[0.98]"
-              >
-                <ShoppingCart className="w-4 h-4" />
-                Buy — Easy Steps
-              </button>
-            )}
+            <a
+              href={property.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-xl transition-all duration-300 active:scale-[0.98]"
+            >
+              Official Auction
+              <ArrowUpRight className="w-4 h-4" />
+            </a>
           </div>
         </div>
       </div>

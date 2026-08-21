@@ -1,430 +1,158 @@
 import { useState } from 'react'
-import { X, Calculator, DollarSign, HardHat, Percent, Home, FileText, Info, Building, Wallet } from 'lucide-react'
-import { Property, FlipAnalysis } from '../types/property'
+import { AlertTriangle, Calculator, CheckCircle2, ExternalLink, Info, Save, X } from 'lucide-react'
+import type { Property } from '../types/property'
+import { analyzeTaxDeedScenario, type TaxDeedScenario } from '../lib/calculator'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useToast } from './ToastProvider'
 
 interface Props {
   property: Property
   onClose: () => void
 }
 
-function formatCurrency(n: number) {
+function money(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return 'Incomplete'
   return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(n)
+    style: 'currency', currency: 'USD', maximumFractionDigits: 0,
+  }).format(value)
+}
+
+const fieldClass = 'w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+
+function NumberField({ label, value, onChange, suffix }: { label: string; value: number; onChange: (value: number) => void; suffix?: string }) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1.5 block text-xs font-semibold text-zinc-400">{label}</span>
+      <div className="relative">
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={value || ''}
+          onChange={(event) => onChange(Math.max(0, Number(event.target.value) || 0))}
+          className={`${fieldClass} ${suffix ? 'pr-10' : ''}`}
+        />
+        {suffix && <span className="pointer-events-none absolute right-3 top-2.5 text-sm text-zinc-500">{suffix}</span>}
+      </div>
+    </label>
+  )
 }
 
 export default function DealCalculator({ property, onClose }: Props) {
-  const [purchasePrice, setPurchasePrice] = useState(property.price)
-  const [rehabCost, setRehabCost] = useState(property.rehabEstimate)
-  const [arv, setArv] = useState(property.arv)
-  const [closingCostsPct, setClosingCostsPct] = useState(3)
-  const [holdingMonths, setHoldingMonths] = useState(6)
-  const [holdingCostMonthly, setHoldingCostMonthly] = useState(800)
-  const [sellingCostsPct, setSellingCostsPct] = useState(6)
-  const [downPaymentPct, setDownPaymentPct] = useState(25)
-  const [interestRate, setInterestRate] = useState(10)
-  const [loanTerm, setLoanTerm] = useState(30)
-  const [propertyTax, setPropertyTax] = useState(1.2)
-  const [insurance, setInsurance] = useState(1200)
-  const [hoaMonthly, setHoaMonthly] = useState(0)
-  const [rentalIncome, setRentalIncome] = useState(0)
-  const [notes, setNotes] = useLocalStorage(`notes-${property.id}`, property.notes)
-
-  const closingCosts = purchasePrice * (closingCostsPct / 100)
-  const holdingCosts = holdingMonths * holdingCostMonthly
-  const sellingCosts = arv * (sellingCostsPct / 100)
-  const loanAmount = purchasePrice * (1 - downPaymentPct / 100)
-  const interestCosts = loanAmount * (interestRate / 100) * (holdingMonths / 12)
-  const totalHolding = holdingCosts + interestCosts
-  const profit = arv - purchasePrice - rehabCost - closingCosts - totalHolding - sellingCosts
-  const totalInvestment = purchasePrice + rehabCost + closingCosts
-  const roi = totalInvestment > 0 ? (profit / totalInvestment) * 100 : 0
-  const cashInvested = (purchasePrice * (downPaymentPct / 100)) + rehabCost + closingCosts
-  const cashOnCash = cashInvested > 0 ? (profit / cashInvested) * 100 : 0
-
-  // Mortgage calculations
-  const r = interestRate / 100 / 12
-  const n = loanTerm * 12
-  const monthlyPI = r > 0 ? loanAmount * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1) : loanAmount / n
-  const monthlyTax = (purchasePrice * (propertyTax / 100)) / 12
-  const monthlyIns = insurance / 12
-  const totalMonthlyPayment = monthlyPI + monthlyTax + monthlyIns + hoaMonthly
-  const monthlyCashFlow = rentalIncome - totalMonthlyPayment - holdingCostMonthly
-  const annualCashFlow = monthlyCashFlow * 12
-  const cashOnCashRental = cashInvested > 0 ? (annualCashFlow / cashInvested) * 100 : 0
-
-  const analysis: FlipAnalysis = {
-    purchasePrice,
-    rehabCost,
-    arv,
-    closingCosts,
-    holdingCosts: totalHolding,
-    sellingCosts,
-    profit,
-    roi,
-    cashOnCash,
+  const initial: TaxDeedScenario = {
+    plannedBid: property.openingBid ?? property.price ?? 0,
+    buyerPremiumRate: 0,
+    auctionFees: 500,
+    titleLegal: 5000,
+    obligationsReserve: 5000,
+    repairs: 0,
+    holdingMonths: 6,
+    monthlyHolding: 900,
+    resaleValue: 0,
+    resaleSource: '',
+    sellingCostRate: 8,
+    fixedExitCosts: 1500,
+    targetProfit: 30000,
+  }
+  const [savedScenario, setSavedScenario] = useLocalStorage<TaxDeedScenario>(`tax-deed-scenario-${property.id}`, initial)
+  const [scenario, setScenario] = useState<TaxDeedScenario>(savedScenario)
+  const { showToast } = useToast()
+  const analysis = analyzeTaxDeedScenario(scenario)
+  const update = <K extends keyof TaxDeedScenario>(key: K, value: TaxDeedScenario[K]) => {
+    setScenario((current) => ({ ...current, [key]: value }))
+  }
+  const save = () => {
+    setSavedScenario(scenario)
+    showToast('Scenario saved on this device', 'success')
   }
 
-  const isGoodDeal = profit > 30000 && roi > 20
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-100 rounded-lg">
-              <Calculator className="w-5 h-5 text-brand-700" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">Deal Analyzer</h2>
-              <p className="text-sm text-gray-500">{property.address}, {property.city}, {property.state}</p>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-2 backdrop-blur-sm sm:p-4" onClick={onClose}>
+      <div className="max-h-[96vh] w-full max-w-5xl overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-zinc-800 bg-zinc-900/95 px-4 py-4 backdrop-blur sm:px-6">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400"><Calculator className="h-5 w-5" /></div>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-white">Maximum Bid Calculator</h2>
+              <p className="truncate text-sm text-zinc-500">{property.address}, {property.city}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
+          <button type="button" onClick={onClose} aria-label="Close calculator" className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-800 hover:text-white"><X className="h-5 w-5" /></button>
+        </header>
 
-        <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left: Inputs */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <DollarSign className="w-4 h-4 text-brand-600" />
-              Financial Inputs
+        <div className="grid grid-cols-1 gap-6 p-4 sm:p-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <section aria-labelledby="calculator-inputs" className="space-y-5">
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 text-sm leading-relaxed text-zinc-300">
+              <div className="mb-1 flex items-center gap-2 font-bold text-amber-400"><Info className="h-4 w-4" /> Scenario, not an appraisal</div>
+              Opening bid is only a starting point. Enter your planned bid, independently researched resale value, and every expected cost. The auction deposit is part of the winning bid, so it is not added again.
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Purchase Price</label>
-                <input
-                  type="number"
-                  value={purchasePrice}
-                  onChange={(e) => setPurchasePrice(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">ARV (After Repair Value)</label>
-                <input
-                  type="number"
-                  value={arv}
-                  onChange={(e) => setArv(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
+            <div>
+              <h3 id="calculator-inputs" className="mb-3 text-sm font-bold text-zinc-200">Purchase and auction costs</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <NumberField label="Planned winning bid" value={scenario.plannedBid} onChange={(value) => update('plannedBid', value)} />
+                <NumberField label="Buyer premium" value={scenario.buyerPremiumRate} onChange={(value) => update('buyerPremiumRate', value)} suffix="%" />
+                <NumberField label="Auction, recording, wire fees" value={scenario.auctionFees} onChange={(value) => update('auctionFees', value)} />
+                <NumberField label="Title search and legal allowance" value={scenario.titleLegal} onChange={(value) => update('titleLegal', value)} />
+                <NumberField label="Liens and risk reserve" value={scenario.obligationsReserve} onChange={(value) => update('obligationsReserve', value)} />
+                <NumberField label="Repairs and stabilization" value={scenario.repairs} onChange={(value) => update('repairs', value)} />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Rehab Cost</label>
-              <input
-                type="number"
-                value={rehabCost}
-                onChange={(e) => setRehabCost(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 mt-6">
-              <HardHat className="w-4 h-4 text-brand-600" />
-              Cost Assumptions
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Closing Costs (%)</label>
-                <input
-                  type="number"
-                  value={closingCostsPct}
-                  onChange={(e) => setClosingCostsPct(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
+              <h3 className="mb-3 text-sm font-bold text-zinc-200">Holding and exit assumptions</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <NumberField label="Holding period" value={scenario.holdingMonths} onChange={(value) => update('holdingMonths', value)} suffix="mo" />
+                <NumberField label="Monthly holding costs" value={scenario.monthlyHolding} onChange={(value) => update('monthlyHolding', value)} />
+                <NumberField label="Expected resale value" value={scenario.resaleValue} onChange={(value) => update('resaleValue', value)} />
+                <NumberField label="Selling costs" value={scenario.sellingCostRate} onChange={(value) => update('sellingCostRate', value)} suffix="%" />
+                <NumberField label="Fixed exit costs" value={scenario.fixedExitCosts} onChange={(value) => update('fixedExitCosts', value)} />
+                <NumberField label="Target profit" value={scenario.targetProfit} onChange={(value) => update('targetProfit', value)} />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Selling Costs (%)</label>
-                <input
-                  type="number"
-                  value={sellingCostsPct}
-                  onChange={(e) => setSellingCostsPct(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
+              <label className="mt-3 block">
+                <span className="mb-1.5 block text-xs font-semibold text-zinc-400">Resale value source</span>
+                <input value={scenario.resaleSource} onChange={(event) => update('resaleSource', event.target.value)} className={fieldClass} placeholder="Example: three nearby sold comparables, reviewed Aug. 21" />
+              </label>
+            </div>
+          </section>
+
+          <aside className="space-y-4">
+            <div className={`rounded-lg border p-5 ${analysis.complete ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
+              <div className="flex items-center gap-2 text-sm font-bold text-zinc-200">
+                {analysis.complete ? <CheckCircle2 className="h-5 w-5 text-emerald-400" /> : <AlertTriangle className="h-5 w-5 text-amber-400" />}
+                {analysis.complete ? 'Scenario calculated' : 'More research required'}
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-4">
+                <div><div className="text-xs text-zinc-500">Maximum bid</div><div className="mt-1 text-xl font-extrabold text-emerald-400 sm:text-2xl">{money(analysis.maximumBid)}</div></div>
+                <div><div className="text-xs text-zinc-500">Estimated profit</div><div className={`mt-1 text-xl font-extrabold sm:text-2xl ${(analysis.projectedProfit ?? 0) >= 0 ? 'text-zinc-100' : 'text-red-400'}`}>{money(analysis.projectedProfit)}</div></div>
+                <div><div className="text-xs text-zinc-500">Cash needed</div><div className="mt-1 text-lg font-bold text-zinc-200">{money(analysis.cashNeeded)}</div></div>
+                <div><div className="text-xs text-zinc-500">Break-even resale</div><div className="mt-1 text-lg font-bold text-zinc-200">{money(analysis.breakEvenResale)}</div></div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Hold Time (months)</label>
-                <input
-                  type="number"
-                  value={holdingMonths}
-                  onChange={(e) => setHoldingMonths(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Monthly Holding Cost</label>
-                <input
-                  type="number"
-                  value={holdingCostMonthly}
-                  onChange={(e) => setHoldingCostMonthly(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4">
+              <h3 className="text-sm font-bold text-zinc-200">Cost breakdown</h3>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex justify-between gap-4"><dt className="text-zinc-500">Bid plus premium</dt><dd className="font-semibold text-zinc-300">{money(analysis.acquisitionCost)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-zinc-500">Non-bid costs</dt><dd className="font-semibold text-zinc-300">{money(analysis.nonBidCosts)}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-zinc-500">Selling costs</dt><dd className="font-semibold text-zinc-300">{money(analysis.sellingCosts)}</dd></div>
+                <div className="flex justify-between gap-4 border-t border-zinc-800 pt-2"><dt className="font-bold text-zinc-300">Total project cost</dt><dd className="font-bold text-white">{money(analysis.totalProjectCost)}</dd></div>
+              </dl>
             </div>
 
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 mt-6">
-              <Percent className="w-4 h-4 text-brand-600" />
-              Financing
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-zinc-200"><AlertTriangle className="h-4 w-4 text-amber-400" /> Research warnings</h3>
+              <ul className="mt-3 space-y-2 text-xs leading-relaxed text-zinc-400">
+                {analysis.warnings.map((warning) => <li key={warning} className="flex gap-2"><span className="text-amber-400">•</span><span>{warning}</span></li>)}
+                <li className="flex gap-2"><span className="text-amber-400">•</span><span>Confirm auction status, title, access, occupancy, zoning, flood risk, condition, and county payment deadlines before bidding.</span></li>
+              </ul>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Down Payment (%)</label>
-                <input
-                  type="number"
-                  value={downPaymentPct}
-                  onChange={(e) => setDownPaymentPct(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Interest Rate (%)</label>
-                <input
-                  type="number"
-                  value={interestRate}
-                  onChange={(e) => setInterestRate(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button type="button" onClick={save} className="flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-bold text-zinc-950 hover:bg-emerald-400"><Save className="h-4 w-4" />Save scenario</button>
+              <a href={property.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm font-bold text-zinc-200 hover:bg-zinc-700">Official auction<ExternalLink className="h-4 w-4" /></a>
             </div>
-
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 mt-6">
-              <Building className="w-4 h-4 text-brand-600" />
-              Mortgage Calculator (Hold Scenario)
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Loan Term (years)</label>
-                <select
-                  value={loanTerm}
-                  onChange={(e) => setLoanTerm(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-                >
-                  <option value={15}>15 years</option>
-                  <option value={20}>20 years</option>
-                  <option value={30}>30 years</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Property Tax (%/yr)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={propertyTax}
-                  onChange={(e) => setPropertyTax(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Insurance ($/yr)</label>
-                <input
-                  type="number"
-                  value={insurance}
-                  onChange={(e) => setInsurance(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">HOA ($/mo)</label>
-                <input
-                  type="number"
-                  value={hoaMonthly}
-                  onChange={(e) => setHoaMonthly(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Rental Income ($/mo) — if holding as rental</label>
-              <input
-                type="number"
-                value={rentalIncome}
-                onChange={(e) => setRentalIncome(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="e.g. 1800"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Your Notes</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                placeholder="Add your inspection notes, contact info, etc..."
-              />
-            </div>
-          </div>
-
-          {/* Right: Results */}
-          <div className="space-y-4">
-            <div className={`p-4 rounded-xl border-2 ${isGoodDeal ? 'border-brand-200 bg-brand-50' : 'border-yellow-200 bg-yellow-50'}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <Home className={`w-5 h-5 ${isGoodDeal ? 'text-brand-700' : 'text-yellow-700'}`} />
-                <h3 className={`font-bold ${isGoodDeal ? 'text-brand-800' : 'text-yellow-800'}`}>
-                  {isGoodDeal ? '✅ Good Deal' : '⚠️ Review Carefully'}
-                </h3>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs text-gray-500">Projected Profit</div>
-                  <div className={`text-2xl font-bold ${profit >= 0 ? 'text-brand-700' : 'text-red-600'}`}>
-                    {formatCurrency(profit)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Total ROI</div>
-                  <div className={`text-2xl font-bold ${roi >= 20 ? 'text-brand-700' : 'text-yellow-700'}`}>
-                    {roi.toFixed(1)}%
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Cash on Cash</div>
-                  <div className="text-lg font-semibold text-gray-900">{cashOnCash.toFixed(1)}%</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Cash Needed</div>
-                  <div className="text-lg font-semibold text-gray-900">{formatCurrency(cashInvested)}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <FileText className="w-4 h-4 text-gray-500" />
-                Cost Breakdown
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Purchase Price</span>
-                  <span className="font-medium">{formatCurrency(analysis.purchasePrice)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Rehab Cost</span>
-                  <span className="font-medium">{formatCurrency(analysis.rehabCost)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Closing Costs ({closingCostsPct}%)</span>
-                  <span className="font-medium">{formatCurrency(analysis.closingCosts)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Holding Costs ({holdingMonths} mo)</span>
-                  <span className="font-medium">{formatCurrency(analysis.holdingCosts)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Selling Costs ({sellingCostsPct}%)</span>
-                  <span className="font-medium">{formatCurrency(analysis.sellingCosts)}</span>
-                </div>
-                <div className="border-t border-gray-200 pt-2 flex justify-between text-base font-bold">
-                  <span className="text-gray-900">Total Investment</span>
-                  <span className="text-gray-900">{formatCurrency(totalInvestment + totalHolding + sellingCosts)}</span>
-                </div>
-                <div className="flex justify-between text-base font-bold">
-                  <span className="text-gray-900">Sale Price (ARV)</span>
-                  <span className="text-gray-900">{formatCurrency(arv)}</span>
-                </div>
-                <div className="border-t-2 border-gray-900 pt-2 flex justify-between text-lg font-bold">
-                  <span className={profit >= 0 ? 'text-brand-700' : 'text-red-600'}>
-                    {profit >= 0 ? 'Profit' : 'Loss'}
-                  </span>
-                  <span className={profit >= 0 ? 'text-brand-700' : 'text-red-600'}>
-                    {formatCurrency(Math.abs(profit))}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Mortgage Summary */}
-            <div className="bg-purple-50 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Wallet className="w-5 h-5 text-purple-700" />
-                <h3 className="font-bold text-purple-900">Hold as Rental</h3>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Loan Amount</span>
-                  <span className="font-medium">{formatCurrency(loanAmount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Monthly P&I</span>
-                  <span className="font-medium">{formatCurrency(monthlyPI)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tax + Insurance</span>
-                  <span className="font-medium">{formatCurrency(monthlyTax + monthlyIns)}</span>
-                </div>
-                {hoaMonthly > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">HOA</span>
-                    <span className="font-medium">{formatCurrency(hoaMonthly)}</span>
-                  </div>
-                )}
-                <div className="border-t border-purple-200 pt-2 flex justify-between font-bold">
-                  <span className="text-gray-900">Total Monthly</span>
-                  <span className="text-gray-900">{formatCurrency(totalMonthlyPayment)}</span>
-                </div>
-                {rentalIncome > 0 && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Rental Income</span>
-                      <span className="font-medium text-brand-700">{formatCurrency(rentalIncome)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Cash Flow / Month</span>
-                      <span className={`font-bold ${monthlyCashFlow >= 0 ? 'text-brand-700' : 'text-red-600'}`}>
-                        {monthlyCashFlow >= 0 ? '+' : ''}{formatCurrency(monthlyCashFlow)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Annual Cash Flow</span>
-                      <span className={`font-bold ${annualCashFlow >= 0 ? 'text-brand-700' : 'text-red-600'}`}>
-                        {annualCashFlow >= 0 ? '+' : ''}{formatCurrency(annualCashFlow)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Cash-on-Cash (Rental)</span>
-                      <span className={`font-bold ${cashOnCashRental >= 0 ? 'text-brand-700' : 'text-red-600'}`}>
-                        {cashOnCashRental.toFixed(1)}%
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-blue-50 rounded-xl p-4 flex items-start gap-3">
-              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-blue-800">
-                <p className="font-semibold mb-1">Flip Rule Check</p>
-                <p>70% Rule: Buy at {formatCurrency(arv * 0.7)} or less. You're at {formatCurrency(purchasePrice + rehabCost)}.</p>
-                <p className="mt-1">
-                  {(purchasePrice + rehabCost) <= arv * 0.7 ? (
-                    <span className="text-brand-700 font-medium">✅ Meets 70% rule</span>
-                  ) : (
-                    <span className="text-yellow-700 font-medium">⚠️ Exceeds 70% rule</span>
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
+          </aside>
         </div>
       </div>
     </div>

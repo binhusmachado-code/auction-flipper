@@ -1,14 +1,18 @@
 import { useState } from 'react'
 import { Search, SlidersHorizontal, X, TrendingUp } from 'lucide-react'
 import { DealFilter } from '../types/property'
-import { STATES, SALE_TYPES, PROPERTY_TYPES, AUCTION_TYPES } from '../data/properties'
+import { SALE_TYPES, PROPERTY_TYPES, AUCTION_TYPES } from '../data/properties'
 
 interface Props {
   filter: DealFilter
+  states: string[]
+  counties: string[]
   onChange: (f: DealFilter) => void
 }
 
-export default function FilterBar({ filter, onChange }: Props) {
+const MAX_PRICE = 10_000_000
+
+export default function FilterBar({ filter, states, counties, onChange }: Props) {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   const update = (partial: Partial<DealFilter>) => {
@@ -18,24 +22,27 @@ export default function FilterBar({ filter, onChange }: Props) {
   const clear = () => {
     onChange({
       state: '',
+      county: '',
       city: '',
       minPrice: 0,
-      maxPrice: 500000,
+      maxPrice: MAX_PRICE,
       propertyType: '',
       saleType: '',
       auctionType: '',
       minInterestRate: 0,
       maxRedemptionPeriod: 60,
       keyword: '',
-      profitOnly: true,
+      profitOnly: false,
+      sortBy: 'auction-soonest',
     })
   }
 
   const isFiltered =
     filter.state ||
+    filter.county ||
     filter.city ||
     filter.minPrice > 0 ||
-    filter.maxPrice < 500000 ||
+    filter.maxPrice < MAX_PRICE ||
     filter.propertyType ||
     filter.saleType ||
     filter.auctionType ||
@@ -44,8 +51,8 @@ export default function FilterBar({ filter, onChange }: Props) {
 
   return (
     <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 mb-6">
-      <div className="flex flex-col lg:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="relative sm:col-span-2 xl:col-span-2">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
           <input
             type="text"
@@ -62,8 +69,19 @@ export default function FilterBar({ filter, onChange }: Props) {
           className="px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
         >
           <option value="">All States</option>
-          {STATES.map((s) => (
+          {states.map((s) => (
             <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+
+        <select
+          value={filter.county}
+          onChange={(e) => update({ county: e.target.value })}
+          className="px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+        >
+          <option value="">All Counties</option>
+          {counties.map((county) => (
+            <option key={county} value={county}>{county}</option>
           ))}
         </select>
 
@@ -79,16 +97,20 @@ export default function FilterBar({ filter, onChange }: Props) {
         </select>
 
         <select
-          value={filter.auctionType}
-          onChange={(e) => update({ auctionType: e.target.value })}
+          value={filter.sortBy}
+          onChange={(e) => update({ sortBy: e.target.value as DealFilter['sortBy'] })}
+          aria-label="Sort listings"
           className="px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
         >
-          <option value="">All Auction Types</option>
-          {AUCTION_TYPES.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
+          <option value="auction-soonest">Auction: soonest</option>
+          <option value="price-low">Price: low to high</option>
+          <option value="price-high">Price: high to low</option>
+          <option value="assessed-high">Assessed value: high</option>
+          <option value="deal">Estimated profit: high</option>
         </select>
+      </div>
 
+      <div className="mt-3 flex flex-wrap gap-3">
         <button
           onClick={() => update({ profitOnly: !filter.profitOnly })}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
@@ -96,10 +118,10 @@ export default function FilterBar({ filter, onChange }: Props) {
               ? 'bg-emerald-500 text-zinc-950'
               : 'bg-zinc-950 border border-zinc-800/60 text-zinc-400 hover:bg-zinc-800'
           }`}
-          title="Only show deals where the numbers say you make money"
+          title="Only show properties with a verified positive profit estimate"
         >
           <TrendingUp className="w-4 h-4" />
-          Money-Makers Only
+          Profit Estimates Only
         </button>
 
         <button
@@ -129,7 +151,7 @@ export default function FilterBar({ filter, onChange }: Props) {
       </div>
 
       {showAdvanced && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-4 pt-4 border-t border-zinc-800/60 animate-fade-in">
+        <div className="grid grid-cols-1 gap-3 border-t border-zinc-800/60 pt-4 mt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 animate-fade-in">
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Property Type</label>
             <select
@@ -145,6 +167,46 @@ export default function FilterBar({ filter, onChange }: Props) {
           </div>
 
           <div>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Auction Type</label>
+            <select
+              value={filter.auctionType}
+              onChange={(e) => update({ auctionType: e.target.value })}
+              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+            >
+              <option value="">All Auctions</option>
+              {AUCTION_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Minimum Price</label>
+            <input
+              type="number"
+              min={0}
+              step={500}
+              placeholder="No minimum"
+              value={filter.minPrice || ''}
+              onChange={(e) => update({ minPrice: Math.max(0, Number(e.target.value) || 0) })}
+              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Maximum Price</label>
+            <input
+              type="number"
+              min={0}
+              step={500}
+              placeholder="No maximum"
+              value={filter.maxPrice === MAX_PRICE ? '' : filter.maxPrice}
+              onChange={(e) => update({ maxPrice: Math.max(0, Number(e.target.value) || MAX_PRICE) })}
+              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            />
+          </div>
+
+          <div>
             <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Min Interest Rate</label>
             <select
               value={filter.minInterestRate}
@@ -156,21 +218,6 @@ export default function FilterBar({ filter, onChange }: Props) {
               <option value={12}>12%+</option>
               <option value={15}>15%+</option>
               <option value={18}>18%+</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Max Bid / Tax Owed</label>
-            <select
-              value={filter.maxPrice < 500000 ? filter.maxPrice : 500000}
-              onChange={(e) => update({ maxPrice: Number(e.target.value) || 500000 })}
-              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
-            >
-              <option value={500000}>Any</option>
-              <option value={25000}>$25k</option>
-              <option value={50000}>$50k</option>
-              <option value={100000}>$100k</option>
-              <option value={250000}>$250k</option>
             </select>
           </div>
 

@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://weguwjxuvibbyqrrvqcw.supabase.co'
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_JauuTENFT1-RfVMhL7FJPQ_VtSxzhGI'
+const configuredUrl = import.meta.env.VITE_SUPABASE_URL
+const configuredKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+export const isSupabaseConfigured = Boolean(configuredUrl && configuredKey)
+
+const supabaseUrl = configuredUrl || 'http://127.0.0.1:54321'
+const supabaseKey = configuredKey || 'auction-flipper-local-fallback'
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {

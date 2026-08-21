@@ -1,0 +1,30 @@
+{
+  "refreshedAt": "2026-08-21",
+  "total": 172,
+  "sources": [
+    {
+      "county": "Broward",
+      "url": "https://broward.deedauction.net/auctions",
+      "count": 15,
+      "status": "verified"
+    },
+    {
+      "county": "Brevard",
+      "url": "https://www.brevardclerk.us/tax-deed-sales",
+      "count": 135,
+      "status": "verified"
+    },
+    {
+      "county": "Suwannee",
+      "url": "https://www.suwgov.org/tax-deed-sales/",
+      "count": 21,
+      "status": "verified"
+    },
+    {
+      "county": "Gulf",
+      "url": "https://www.gulfclerk.com/courts/tax-deeds/",
+      "count": 1,
+      "status": "verified"
+    }
+  ]
+}

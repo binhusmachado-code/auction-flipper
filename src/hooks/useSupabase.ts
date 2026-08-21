@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase.ts'
+import { isSupabaseConfigured, supabase } from '../lib/supabase.ts'
 import { useToast } from '../components/ToastProvider.tsx'
 import type { Property } from '../types/property'
-import bundledProperties from '../data/live_properties.json'
 import taxDeedProperties from '../data/tax_deed_properties.json'
 
 type PropertyRecord = Record<string, unknown>
@@ -64,13 +63,18 @@ function normalizeProperty(row: PropertyRecord): Property {
   }
 }
 
-const fallbackProperties = ([...taxDeedProperties, ...bundledProperties] as PropertyRecord[]).map(normalizeProperty)
+const officialTaxDeedProperties = (taxDeedProperties as PropertyRecord[]).map(normalizeProperty)
 
 export function useSupabaseAuth() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false)
+      return
+    }
+
     let mounted = true
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       if (mounted) {
@@ -93,12 +97,25 @@ export function useSupabaseAuth() {
   return { user, loading }
 }
 
-export function useSupabaseProperties() {
+export function useSupabaseProperties(hasMemberAccess = false) {
   const [properties, setProperties] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
 
   useEffect(() => {
+    const membershipEnabled = import.meta.env.VITE_MEMBERSHIP_ENABLED === 'true'
+    const publicPreview = officialTaxDeedProperties.slice(0, 3)
+    if (!isSupabaseConfigured) {
+      setProperties(officialTaxDeedProperties)
+      setLoading(false)
+      return
+    }
+    if (membershipEnabled && !hasMemberAccess) {
+      setProperties(publicPreview)
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     supabase
       .from('properties')
@@ -107,20 +124,31 @@ export function useSupabaseProperties() {
       .then(({ data, error }: any) => {
         if (cancelled) return
         if (error) {
-          console.warn('Live property data unavailable; using bundled listings.', error)
-          setProperties(fallbackProperties)
+          console.warn('Live property data unavailable; using official county listings.', error)
+          setProperties(membershipEnabled ? publicPreview : officialTaxDeedProperties)
         } else if (data?.length) {
           const mapped: Property[] = data.map(normalizeProperty)
-          setProperties(mapped)
+          if (membershipEnabled) {
+            setProperties(mapped)
+          } else {
+            const merged = new Map(officialTaxDeedProperties.map((property) => [property.id, property]))
+            mapped.forEach((property) => merged.set(property.id, property))
+            setProperties([...merged.values()])
+          }
         } else {
-          setProperties(fallbackProperties)
+          setProperties(membershipEnabled ? publicPreview : officialTaxDeedProperties)
         }
         setLoading(false)
       })
     return () => { cancelled = true }
-  }, [showToast])
+  }, [hasMemberAccess, showToast])
 
   const addProperty = useCallback(async (p: Property) => {
+    if (!isSupabaseConfigured) {
+      showToast('Online accounts are not configured', 'error')
+      return false
+    }
+
     const row = {
       id: p.id,
       address: p.address,

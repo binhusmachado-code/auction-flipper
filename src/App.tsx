@@ -1,63 +1,93 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, MapPin, BookOpen, ChevronDown, ChevronUp } from 'lucide-react'
-import { Property, DealFilter, STATE_TAX_SALE_DATA } from './types/property'
+import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, Calculator, UserRound } from 'lucide-react'
+import { Property, DealFilter } from './types/property'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useToast } from './components/ToastProvider.tsx'
 import { useSupabaseAuth, useSupabaseProperties, useSupabaseFavorites } from './hooks/useSupabase.ts'
-import { supabase } from './lib/supabase.ts'
+import { useMembership } from './hooks/useMembership.ts'
 import FilterBar from './components/FilterBar'
 import PropertyCard from './components/PropertyCard'
 import MapView from './components/MapView'
 import AuthModal from './components/AuthModal.tsx'
-import BuyWizard from './components/BuyWizard.tsx'
-import Guide from './components/Guide.tsx'
+import OnboardingWizard from './components/OnboardingWizard.tsx'
+import DealCalculator from './components/DealCalculator.tsx'
 import { isProfitable, dealProfit, marketValue } from './lib/deal.ts'
+import taxDeedMetadata from './data/tax_deed_metadata.json'
 import './index.css'
 
 function formatCurrency(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 }
 
+function formatAuctionDate(value: string) {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    .format(new Date(`${value}T12:00:00`))
+}
+
 export default function App() {
   const { showToast } = useToast()
   const { user } = useSupabaseAuth()
-  const { properties: supabaseProperties, loading: propertiesLoading } = useSupabaseProperties()
-  const { favorites: supabaseFavorites, toggleFavorite: toggleSupabaseFavorite } = useSupabaseFavorites(user?.id ?? null)
+  const membershipEnabled = import.meta.env.VITE_MEMBERSHIP_ENABLED === 'true'
+  const { membership } = useMembership(user?.id ?? null)
+  const { properties: supabaseProperties, loading: propertiesLoading } = useSupabaseProperties(membership.active)
+  const memberDataUserId = !membershipEnabled || membership.active ? user?.id ?? null : null
+  const { favorites: supabaseFavorites, toggleFavorite: toggleSupabaseFavorite } = useSupabaseFavorites(memberDataUserId)
 
   const [localFavorites, setLocalFavorites] = useLocalStorage<string[]>('favorites', [])
-  const favorites = user?.id ? supabaseFavorites : localFavorites
+  const favorites = memberDataUserId ? supabaseFavorites : localFavorites
 
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
-  const [buyProperty, setBuyProperty] = useState<Property | null>(null)
+  const [calculatorProperty, setCalculatorProperty] = useState<Property | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
-  const [showStateDirectory, setShowStateDirectory] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [view, setView] = useState<'all' | 'favorites' | 'map'>('all')
   const [filter, setFilter] = useState<DealFilter>({
     state: '',
+    county: '',
     city: '',
     minPrice: 0,
-    maxPrice: 500000,
+    maxPrice: 10_000_000,
     propertyType: '',
     saleType: '',
     auctionType: '',
     minInterestRate: 0,
     maxRedemptionPeriod: 60,
     keyword: '',
-    profitOnly: true,
+    profitOnly: false,
+    sortBy: 'auction-soonest',
   })
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {})
+      navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {})
     }
   }, [])
 
   const properties = supabaseProperties
+  const currentProperties = useMemo(() => {
+    const today = new Date()
+    const todayKey = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0'),
+    ].join('-')
+    return properties.filter((property) => {
+      if (property.status === 'Sold' || property.status === 'Cancelled' || property.status === 'Removed') return false
+      return !property.auctionDate || property.auctionDate >= todayKey
+    })
+  }, [properties])
+  const counties = useMemo(
+    () => [...new Set(currentProperties.map((property) => property.county).filter(Boolean))].sort(),
+    [currentProperties]
+  )
+  const states = useMemo(
+    () => [...new Set(currentProperties.map((property) => property.state).filter(Boolean))].sort(),
+    [currentProperties]
+  )
 
   const toggleFavorite = async (id: string) => {
-    if (user?.id) {
+    if (memberDataUserId) {
       await toggleSupabaseFavorite(id)
     } else {
       setLocalFavorites((prev) => {
@@ -75,19 +105,18 @@ export default function App() {
   }
 
   const openGuide = () => {
-    setBuyProperty(null)
     setShowMobileMenu(false)
     setShowGuide(true)
   }
 
   const filtered = useMemo(() => {
-    let list = properties
+    let list = currentProperties
     if (view === 'favorites') list = list.filter((p) => favorites.includes(p.id))
 
     return list.filter((p) => {
-      if (p.status === 'Sold' || p.status === 'Cancelled') return false
       if (filter.profitOnly && marketValue(p) > 0 && !isProfitable(p)) return false
       if (filter.state && p.state !== filter.state) return false
+      if (filter.county && p.county !== filter.county) return false
       if (filter.city && p.city !== filter.city) return false
       if (filter.propertyType && p.propertyType !== filter.propertyType) return false
       if (filter.saleType && p.saleType !== filter.saleType) return false
@@ -108,14 +137,49 @@ export default function App() {
         if (!match) return false
       }
       return true
-    }).sort((a, b) => dealProfit(b) - dealProfit(a))
-  }, [properties, favorites, view, filter])
+    }).sort((a, b) => {
+      if (filter.sortBy === 'price-low') return a.price - b.price
+      if (filter.sortBy === 'price-high') return b.price - a.price
+      if (filter.sortBy === 'assessed-high') return b.assessedValue - a.assessedValue
+      if (filter.sortBy === 'deal') return dealProfit(b) - dealProfit(a)
+      const aDate = a.auctionDate ? new Date(`${a.auctionDate}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER
+      const bDate = b.auctionDate ? new Date(`${b.auctionDate}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER
+      return aDate - bDate || a.price - b.price
+    })
+  }, [currentProperties, favorites, view, filter])
+
+  const upcomingAuctions = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const auctions = new Map<string, { date: string; county: string; source: string; sourceUrl: string; count: number }>()
+    currentProperties.forEach((property) => {
+      if (property.saleType !== 'Tax Deed' || !property.auctionDate || property.status !== 'Active') return
+      if (new Date(`${property.auctionDate}T12:00:00`) < today) return
+      const key = `${property.county}|${property.auctionDate}`
+      const existing = auctions.get(key)
+      if (existing) {
+        existing.count += 1
+      } else {
+        auctions.set(key, {
+          date: property.auctionDate,
+          county: property.county,
+          source: property.source,
+          sourceUrl: property.sourceUrl,
+          count: 1,
+        })
+      }
+    })
+    return [...auctions.values()].sort((a, b) => a.date.localeCompare(b.date))
+  }, [currentProperties])
 
   // Stats
   const totalTaxOwed = filtered.reduce((s, p) => s + p.price, 0)
-  const avgInterestRate = filtered.length > 0 ? (filtered.reduce((s, p) => s + p.interestRate, 0) / filtered.length).toFixed(1) : '0'
+  const lienProperties = filtered.filter(p => p.saleType === 'Tax Lien')
+  const avgInterestRate = lienProperties.length > 0
+    ? (lienProperties.reduce((sum, property) => sum + property.interestRate, 0) / lienProperties.length).toFixed(1)
+    : '0'
   const statesCount = new Set(filtered.map(p => p.state)).size
-  const lienCount = filtered.filter(p => p.saleType === 'Tax Lien').length
+  const lienCount = lienProperties.length
   const deedCount = filtered.filter(p => p.saleType === 'Tax Deed').length
 
   const navLink = (key: 'all' | 'favorites' | 'map', label: string, icon: React.ReactNode) => (
@@ -168,21 +232,13 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              {user ? (
-                <button
-                  onClick={async () => { await supabase.auth.signOut(); showToast('Signed out', 'info') }}
-                  className="px-4 py-2 text-xs font-bold text-zinc-400 hover:text-zinc-200 transition-colors"
-                >
-                  Sign Out
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowAuthModal(true)}
-                  className="pill-btn !px-4 !py-2 text-xs"
-                >
-                  Sign In
-                </button>
-              )}
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="pill-btn !px-3 !py-2 text-xs sm:!px-4"
+              >
+                <UserRound className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{user ? 'Account' : 'Membership'}</span>
+              </button>
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 aria-label={showMobileMenu ? 'Close navigation menu' : 'Open navigation menu'}
@@ -209,7 +265,7 @@ export default function App() {
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 text-emerald-400 text-[11px] font-bold uppercase tracking-[0.2em] rounded-full mb-6 border border-emerald-500/20">
             <TrendingUp className="w-3 h-3" />
-            Official & Aggregated Auction Leads
+            Official County Auction Records
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1] text-balance">
             Tax Lien &<br className="hidden sm:block" /> Deed Investing
@@ -223,7 +279,7 @@ export default function App() {
             {[
               { name: 'Tax Liens', count: lienCount, color: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
               { name: 'Tax Deeds', count: deedCount, color: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
-              { name: 'All Listings', count: properties.length, color: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
+              { name: 'Active Listings', count: currentProperties.length, color: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
             ].map((s) => (
               <div
                 key={s.name}
@@ -263,7 +319,7 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main id="deals" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+      <main id="deals" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 scroll-mt-28">
         {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
@@ -284,7 +340,60 @@ export default function App() {
           </div>
         </div>
 
-        <FilterBar filter={filter} onChange={setFilter} />
+        {upcomingAuctions.length > 0 && (
+          <section className="mb-8 scroll-mt-28" aria-labelledby="upcoming-auctions-title">
+            <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+              <div>
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-amber-400" />
+                  <h2 id="upcoming-auctions-title" className="text-lg font-bold text-zinc-100">Upcoming Tax Deed Auctions</h2>
+                </div>
+                <p className="mt-1 text-sm text-zinc-500">Next official county sale dates and active parcel counts.</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Verified {formatAuctionDate(taxDeedMetadata.refreshedAt)}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              {upcomingAuctions.map((auction, index) => (
+                <a
+                  key={`${auction.county}-${auction.date}`}
+                  href={auction.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`group rounded-xl border p-4 transition-colors ${
+                    index === 0
+                      ? 'border-amber-500/30 bg-amber-500/10 hover:border-amber-400/60'
+                      : 'border-zinc-800/60 bg-zinc-900/50 hover:border-emerald-500/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                      {index === 0 ? 'Next Auction' : auction.county}
+                    </span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-zinc-600 transition-colors group-hover:text-emerald-400" />
+                  </div>
+                  <div className="mt-2 text-base font-extrabold text-zinc-100">{formatAuctionDate(auction.date)}</div>
+                  <div className="mt-1 text-xs text-zinc-400">{auction.county} County</div>
+                  <div className="mt-3 text-xs font-bold text-emerald-400">{auction.count.toLocaleString()} active {auction.count === 1 ? 'property' : 'properties'}</div>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />
+
+        {membershipEnabled && !membership.active && (
+          <div className="mb-6 flex flex-col items-start justify-between gap-4 rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-5 sm:flex-row sm:items-center">
+            <div>
+              <div className="text-sm font-bold text-emerald-400">Public preview</div>
+              <p className="mt-1 text-sm text-zinc-400">Sign in with an active membership to open the full supported-county inventory, saved work, and alerts.</p>
+            </div>
+            <button type="button" onClick={() => setShowAuthModal(true)} className="flex-none rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-bold text-zinc-950 hover:bg-emerald-400">View membership</button>
+          </div>
+        )}
 
         {propertiesLoading && (
           <div className="flex items-center justify-center py-20">
@@ -319,66 +428,9 @@ export default function App() {
                   property={p}
                   onSelect={setSelectedProperty}
                   onToggleFavorite={toggleFavorite}
-                  onBuy={setBuyProperty}
                   isFavorite={favorites.includes(p.id)}
                 />
               ))}
-            </div>
-          )}
-        </div>
-
-        {/* State Directory */}
-        <div className="mt-20">
-          <button
-            onClick={() => setShowStateDirectory(!showStateDirectory)}
-            className="flex w-full min-w-0 items-center gap-3 mb-6"
-          >
-            <div className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800/60">
-              <MapPin className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div className="min-w-0 flex-1 text-left">
-              <h3 className="font-bold text-zinc-100 text-base sm:text-lg break-words">State-by-State Directory</h3>
-              <p className="text-sm text-zinc-500">Which states are Tax Lien vs Tax Deed</p>
-            </div>
-            {showStateDirectory ? <ChevronUp className="w-5 h-5 flex-shrink-0 text-zinc-500" /> : <ChevronDown className="w-5 h-5 flex-shrink-0 text-zinc-500" />}
-          </button>
-
-          {showStateDirectory && (
-            <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-6 animate-fade-in">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {STATE_TAX_SALE_DATA.map((s) => (
-                  <div
-                    key={s.state}
-                    className={`p-4 rounded-xl border ${
-                      s.type === 'Tax Lien'
-                        ? 'bg-emerald-500/5 border-emerald-500/10'
-                        : s.type === 'Tax Deed'
-                        ? 'bg-amber-500/5 border-amber-500/10'
-                        : 'bg-zinc-800/30 border-zinc-700/30'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold text-zinc-200">{s.state}</span>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        s.type === 'Tax Lien'
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : s.type === 'Tax Deed'
-                          ? 'bg-amber-500/10 text-amber-400'
-                          : 'bg-zinc-700/30 text-zinc-400'
-                      }`}>
-                        {s.type}
-                      </span>
-                    </div>
-                    <div className="text-xs text-zinc-500 space-y-0.5">
-                      <div>Rate: <span className="text-zinc-300">{s.interestRate}</span></div>
-                      <div>Redemption: <span className="text-zinc-300">{s.redemptionPeriod}</span></div>
-                      {s.countiesWithData.length > 0 && (
-                        <div className="text-emerald-400 mt-1">Data available: {s.countiesWithData.join(', ')}</div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
         </div>
@@ -392,14 +444,15 @@ export default function App() {
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-zinc-100 text-lg">Data Sources</h3>
               <p className="text-sm text-zinc-500 mt-1 max-w-2xl">
-                Broward tax deeds and NYC lien records link to their official sources. Other aggregated auction leads may be incomplete.
+                Broward, Brevard, Suwannee, and Gulf tax deeds link directly to their official county sources.
                 Always verify the current county file, title, liens, condition, and bid amount independently.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
                 {[
-                  { name: 'NYC OpenData', url: 'https://data.cityofnewyork.us/City-Government/Tax-Lien-Sale-Lists/9rz4-mjek', desc: 'NYC Tax Lien Sale Lists — 260K+ records' },
                   { name: 'Broward Tax Deeds', url: 'https://broward.deedauction.net/auctions', desc: 'Official upcoming Broward County tax deed auctions' },
-                  { name: 'data.gov', url: 'https://catalog.data.gov/dataset?q=tax+lien', desc: 'Federal open data catalog' },
+                  { name: 'Brevard Tax Deeds', url: 'https://www.brevardclerk.us/tax-deed-sales', desc: 'Official September and October sale schedules' },
+                  { name: 'Suwannee Tax Deeds', url: 'https://www.suwgov.org/tax-deed-sales/', desc: 'Official next-sale schedule and bidder rules' },
+                  { name: 'Gulf Tax Deeds', url: 'https://www.gulfclerk.com/courts/tax-deeds/', desc: 'Official active sale listings and reports' },
                 ].map((s) => (
                   <a
                     key={s.name}
@@ -465,7 +518,7 @@ export default function App() {
                 </div>
                 <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
                   <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                    {selectedProperty.saleType === 'Tax Lien' ? 'Redemption' : 'Required Deposit'}
+                    {selectedProperty.saleType === 'Tax Lien' ? 'Redemption' : 'Est. Min. Deposit'}
                   </div>
                   <div className="text-lg font-bold text-zinc-200">
                     {selectedProperty.saleType === 'Tax Lien' ? `${selectedProperty.redemptionPeriod} mo` : formatCurrency(selectedProperty.depositRequired ?? 0)}
@@ -521,6 +574,16 @@ export default function App() {
                 View Source Data
                 <ArrowUpRight className="w-4 h-4" />
               </a>
+              {selectedProperty.saleType === 'Tax Deed' && (
+                <button
+                  type="button"
+                  onClick={() => { setCalculatorProperty(selectedProperty); setSelectedProperty(null) }}
+                  className="mt-2 w-full flex items-center justify-center gap-2 py-3 border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold rounded-xl transition-all"
+                >
+                  <Calculator className="w-4 h-4" />
+                  Calculate Maximum Bid
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -530,17 +593,18 @@ export default function App() {
         <AuthModal onClose={() => setShowAuthModal(false)} />
       )}
 
-      {buyProperty && (
-        <BuyWizard
-          property={buyProperty}
-          userId={user?.id ?? null}
-          onClose={() => setBuyProperty(null)}
-          onOpenGuide={openGuide}
+      {showGuide && (
+        <OnboardingWizard
+          onClose={() => setShowGuide(false)}
+          onOpenCalculator={() => {
+            const example = currentProperties[0]
+            if (example) setCalculatorProperty(example)
+          }}
         />
       )}
 
-      {showGuide && (
-        <Guide onClose={() => setShowGuide(false)} />
+      {calculatorProperty && (
+        <DealCalculator property={calculatorProperty} onClose={() => setCalculatorProperty(null)} />
       )}
     </div>
   )
