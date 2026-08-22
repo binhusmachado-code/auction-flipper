@@ -152,8 +152,12 @@ export default function App() {
       }
       return true
     }).sort((a, b) => {
-      if (filter.sortBy === 'price-low') return a.price - b.price
-      if (filter.sortBy === 'price-high') return b.price - a.price
+      if (filter.sortBy === 'price-low' || filter.sortBy === 'price-high') {
+        const aHasPrice = a.price > 0
+        const bHasPrice = b.price > 0
+        if (aHasPrice !== bHasPrice) return aHasPrice ? -1 : 1
+        return filter.sortBy === 'price-low' ? a.price - b.price : b.price - a.price
+      }
       if (filter.sortBy === 'assessed-high') return b.assessedValue - a.assessedValue
       if (filter.sortBy === 'deal') return dealProfit(b) - dealProfit(a)
       const aDate = a.auctionDate ? new Date(`${a.auctionDate}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER
