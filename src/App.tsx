@@ -469,7 +469,7 @@ export default function App() {
                 {[
                   { name: 'Bay Tax Deeds', url: 'https://records2.baycoclerk.com/TaxDeed/', desc: 'Official Clerk case search and future sale calendar' },
                   { name: 'Brevard Tax Deeds', url: 'https://www.brevardclerk.us/tax-deed-sales', desc: 'Official sale schedules and bidder information' },
-                  { name: 'Broward Tax Deeds', url: 'https://www.broward.org/RecordsTaxesTreasury/taxcollector/Pages/TaxDeeds.aspx', desc: 'Official county page; catalog marks retained data as stale' },
+                  { name: 'Broward Tax Deeds', url: 'https://county-taxes.net/broward/reports/real-estate', desc: 'Official Tax Collector future auction reports and certified property lists' },
                   { name: 'Clay Tax Deeds', url: 'https://landmark.clayclerk.com/TaxDeed/', desc: 'Official Clerk case search and future sale calendar' },
                   { name: 'Collier Tax Deeds', url: 'https://notices.collierclerk.com/genre/tax-deeds/', desc: 'Official Clerk legal notices and auction dates' },
                   { name: 'Duval Tax Deeds', url: 'https://taxdeed.duvalclerk.com/', desc: 'Official Clerk case search and future sale calendar' },
