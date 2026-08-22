@@ -1,37 +1,43 @@
-const CACHE_NAME = 'auction-flipper-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
-];
+const CACHE_NAME = 'auction-flipper-v3'
+const SCOPE = self.registration.scope
+const APP_SHELL = [
+  SCOPE,
+  new URL('manifest.json', SCOPE).href,
+  new URL('icon-192.png', SCOPE).href,
+  new URL('icon-512.png', SCOPE).href,
+]
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
-  self.skipWaiting();
-});
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)))
+  self.skipWaiting()
+})
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      );
-    })
-  );
-  self.clients.claim();
-});
+    caches.keys().then((names) => Promise.all(
+      names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
+    ))
+  )
+  self.clients.claim()
+})
 
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return
+
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
-  );
-});
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
+        }
+        return response
+      })
+      .catch(async () => {
+        const cached = await caches.match(event.request)
+        if (cached) return cached
+        if (event.request.mode === 'navigate') return caches.match(SCOPE)
+        return Response.error()
+      })
+  )
+})
