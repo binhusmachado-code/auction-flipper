@@ -1,16 +1,18 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, Calculator, UserRound } from 'lucide-react'
+import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, Calculator, ShieldCheck, UserRound } from 'lucide-react'
 import { Property, DealFilter } from './types/property'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useToast } from './components/ToastProvider.tsx'
 import { useSupabaseAuth, useSupabaseProperties, useSupabaseFavorites } from './hooks/useSupabase.ts'
 import { useMembership } from './hooks/useMembership.ts'
+import { useAccountProfile } from './hooks/useAccount.ts'
 import FilterBar from './components/FilterBar'
 import PropertyCard from './components/PropertyCard'
 import MapView from './components/MapView'
 import AuthModal from './components/AuthModal.tsx'
 import OnboardingWizard from './components/OnboardingWizard.tsx'
 import DealCalculator from './components/DealCalculator.tsx'
+import AccountDashboard from './components/AccountDashboard.tsx'
 import { isProfitable, dealProfit, marketValue } from './lib/deal.ts'
 import taxDeedMetadata from './data/tax_deed_metadata.json'
 import './index.css'
@@ -27,6 +29,7 @@ function formatAuctionDate(value: string) {
 export default function App() {
   const { showToast } = useToast()
   const { user } = useSupabaseAuth()
+  const { profile } = useAccountProfile(user?.id ?? null, user?.email ?? '')
   const membershipEnabled = import.meta.env.VITE_MEMBERSHIP_ENABLED === 'true'
   const { membership } = useMembership(user?.id ?? null)
   const { properties: supabaseProperties, loading: propertiesLoading } = useSupabaseProperties(membership.active)
@@ -39,6 +42,7 @@ export default function App() {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [calculatorProperty, setCalculatorProperty] = useState<Property | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showAccountDashboard, setShowAccountDashboard] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [view, setView] = useState<'all' | 'favorites' | 'map'>('all')
@@ -63,6 +67,16 @@ export default function App() {
       navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {})
     }
   }, [])
+
+  useEffect(() => {
+    if (!window.location.hash.includes('account')) return
+    if (user && profile) {
+      setShowAuthModal(false)
+      setShowAccountDashboard(true)
+    } else {
+      setShowAuthModal(true)
+    }
+  }, [profile, user])
 
   const properties = supabaseProperties
   const currentProperties = useMemo(() => {
@@ -233,11 +247,12 @@ export default function App() {
 
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => user && profile ? setShowAccountDashboard(true) : setShowAuthModal(true)}
+                aria-label={profile?.role === 'admin' ? 'Owner' : user ? 'Dashboard' : 'Membership'}
                 className="pill-btn !px-3 !py-2 text-xs sm:!px-4"
               >
-                <UserRound className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{user ? 'Account' : 'Membership'}</span>
+                {profile?.role === 'admin' ? <ShieldCheck className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">{profile?.role === 'admin' ? 'Owner' : user ? 'Dashboard' : 'Membership'}</span>
               </button>
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -449,7 +464,7 @@ export default function App() {
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
                 {[
-                  { name: 'Broward Tax Deeds', url: 'https://broward.deedauction.net/auctions', desc: 'Official upcoming Broward County tax deed auctions' },
+                  { name: 'Broward Tax Deeds', url: 'https://broward.realtaxdeed.com/', desc: 'Official Broward County RealAuction tax deed site' },
                   { name: 'Brevard Tax Deeds', url: 'https://www.brevardclerk.us/tax-deed-sales', desc: 'Official September and October sale schedules' },
                   { name: 'Suwannee Tax Deeds', url: 'https://www.suwgov.org/tax-deed-sales/', desc: 'Official next-sale schedule and bidder rules' },
                   { name: 'Gulf Tax Deeds', url: 'https://www.gulfclerk.com/courts/tax-deeds/', desc: 'Official active sale listings and reports' },
@@ -590,12 +605,40 @@ export default function App() {
       )}
 
       {showAuthModal && (
-        <AuthModal onClose={() => setShowAuthModal(false)} />
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
+          onOpenDashboard={() => {
+            setShowAuthModal(false)
+            window.requestAnimationFrame(() => setShowAccountDashboard(true))
+          }}
+        />
+      )}
+
+      {showAccountDashboard && user && profile && (
+        <AccountDashboard
+          user={user}
+          profile={profile}
+          properties={currentProperties}
+          favoriteIds={favorites}
+          onClose={() => setShowAccountDashboard(false)}
+          onOpenGuide={() => {
+            setShowAccountDashboard(false)
+            openGuide()
+          }}
+          onOpenCalculator={(property) => {
+            setShowAccountDashboard(false)
+            setCalculatorProperty(property)
+          }}
+        />
       )}
 
       {showGuide && (
         <OnboardingWizard
           onClose={() => setShowGuide(false)}
+          onCreateAccount={() => {
+            setShowGuide(false)
+            setShowAuthModal(true)
+          }}
           onOpenCalculator={() => {
             const example = currentProperties[0]
             if (example) setCalculatorProperty(example)

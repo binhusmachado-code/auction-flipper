@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, CreditCard, Loader2, Lock, Mail, X } from 'lucide-react'
+import { Check, CreditCard, LayoutDashboard, Loader2, Lock, Mail, X } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { openBillingPortal, startCheckout } from '../lib/billing'
 import { MEMBERSHIP_PRICING } from '../lib/pricing'
@@ -9,11 +9,12 @@ import { useToast } from './ToastProvider'
 
 interface Props {
   onClose: () => void
+  onOpenDashboard?: () => void
 }
 
 type AuthMode = 'sign-in' | 'sign-up' | 'reset'
 
-export default function AuthModal({ onClose }: Props) {
+export default function AuthModal({ onClose, onOpenDashboard }: Props) {
   const { user } = useSupabaseAuth()
   const { membership } = useMembership(user?.id ?? null)
   const [mode, setMode] = useState<AuthMode>('sign-in')
@@ -23,6 +24,7 @@ export default function AuthModal({ onClose }: Props) {
   const [yearly, setYearly] = useState(false)
   const { showToast } = useToast()
   const billingEnabled = import.meta.env.VITE_BILLING_ENABLED === 'true'
+  const accountRedirect = `${window.location.origin}${window.location.pathname}#/account`
 
   const submitAuth = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -30,11 +32,15 @@ export default function AuthModal({ onClose }: Props) {
     setLoading('auth')
     try {
       if (mode === 'reset') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.href })
+        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: accountRedirect })
         if (error) throw error
         showToast('Password reset link sent', 'success')
       } else if (mode === 'sign-up') {
-        const { error } = await supabase.auth.signUp({ email, password })
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: accountRedirect },
+        })
         if (error) throw error
         showToast('Account created. Check your email if confirmation is required.', 'success')
       } else {
@@ -100,9 +106,10 @@ export default function AuthModal({ onClose }: Props) {
               <h3 className="mt-2 text-xl font-bold text-white">Signed in as {user.email}</h3>
               <div className="mt-5 rounded-lg border border-zinc-800 bg-zinc-950/60 p-4">
                 <div className="text-xs text-zinc-500">Membership status</div>
-                <div className={`mt-1 text-sm font-bold ${membership.active ? 'text-emerald-400' : 'text-amber-400'}`}>{membership.active ? `${membership.plan ?? 'Paid'} membership active` : 'No active membership'}</div>
+                <div className={`mt-1 text-sm font-bold ${membership.active ? 'text-emerald-400' : 'text-amber-400'}`}>{membership.active ? membership.accessSource === 'manual' ? 'Owner-granted access active' : `${membership.plan ?? 'Paid'} membership active` : 'No active membership'}</div>
               </div>
-              <button type="button" onClick={async () => { await supabase.auth.signOut(); showToast('Signed out', 'info') }} className="mt-4 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm font-bold text-zinc-200 hover:bg-zinc-700">Sign out</button>
+              {onOpenDashboard && <button type="button" onClick={onOpenDashboard} className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-bold text-zinc-950 hover:bg-emerald-400"><LayoutDashboard className="h-4 w-4" />Open dashboard</button>}
+              <button type="button" onClick={async () => { await supabase.auth.signOut(); showToast('Signed out', 'info') }} className="mt-3 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm font-bold text-zinc-200 hover:bg-zinc-700">Sign out</button>
             </div>
           ) : !isSupabaseConfigured ? (
             <div className="flex min-h-[360px] flex-col justify-center">

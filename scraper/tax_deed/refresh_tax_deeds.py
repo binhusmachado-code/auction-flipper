@@ -19,7 +19,7 @@ from suwannee_tax_deed import fetch_upcoming as fetch_suwannee
 
 
 FEEDS: list[tuple[str, str, str, Callable[[], list[dict]]]] = [
-    ("broward-tax-deed-", "Broward", "https://broward.deedauction.net/auctions", fetch_broward),
+    ("broward-tax-deed-", "Broward", "https://broward.realtaxdeed.com/", fetch_broward),
     ("brevard-tax-deed-", "Brevard", "https://www.brevardclerk.us/tax-deed-sales", fetch_brevard),
     ("suwannee-tax-deed-", "Suwannee", "https://www.suwgov.org/tax-deed-sales/", fetch_suwannee),
     ("gulf-tax-deed-", "Gulf", "https://www.gulfclerk.com/courts/tax-deeds/", fetch_gulf),
@@ -84,6 +84,8 @@ def refresh(output: Path, metadata_output: Path) -> list[dict]:
                 if str(record.get("id", "")).startswith(prefix)
                 and str(record.get("auctionDate", "")) >= current_date.isoformat()
             ]
+            for record in records:
+                record["sourceUrl"] = url
             status = "cached"
         properties.extend(records)
         source_metadata.append({"county": county, "url": url, "count": len(records), "status": status})

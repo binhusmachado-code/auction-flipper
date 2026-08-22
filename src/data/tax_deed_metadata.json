@@ -4,9 +4,9 @@
   "sources": [
     {
       "county": "Broward",
-      "url": "https://broward.deedauction.net/auctions",
+      "url": "https://broward.realtaxdeed.com/",
       "count": 15,
-      "status": "verified"
+      "status": "cached"
     },
     {
       "county": "Brevard",

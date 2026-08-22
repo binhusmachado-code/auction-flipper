@@ -13,7 +13,8 @@ from bs4 import BeautifulSoup
 
 from shared import HEADERS, base_property, centroid, money, property_type
 
-BASE_URL = "https://broward.deedauction.net"
+OFFICIAL_URL = "https://broward.realtaxdeed.com"
+LEGACY_BASE_URL = "https://broward.deedauction.net"
 PARCEL_LAYER = "https://gisweb-adapters.bcpa.net/arcgis/rest/services/BCPA_EXTERNAL_JAN26/MapServer/16"
 ADDRESS_LOCATIONS = {
     "4274 NW 89 AVE": ("Coral Springs", "33065"),
@@ -35,10 +36,17 @@ def detail_fields(html: str) -> dict[str, str]:
 
 
 def fetch_upcoming() -> list[dict]:
+    # Broward migrated from DeedAuction to RealAuction in 2026. The new public
+    # site currently blocks non-browser requests, so do not silently publish
+    # records from the retired platform as newly verified data.
+    raise RuntimeError(f"Broward RealAuction browser adapter is pending for {OFFICIAL_URL}")
+
+
+def fetch_legacy_upcoming() -> list[dict]:
     session = requests.Session()
     session.headers.update(HEADERS)
     response = session.post(
-        f"{BASE_URL}/auctions/upcoming",
+        f"{LEGACY_BASE_URL}/auctions/upcoming",
         headers={"X-Requested-With": "XMLHttpRequest"},
         data={"draw": "1", "start": "0", "length": "100"},
         timeout=30,
@@ -47,7 +55,7 @@ def fetch_upcoming() -> list[dict]:
     properties: list[dict] = []
     for auction in response.json().get("data", []):
         auction_id = str(auction["id"])
-        auction_url = f"{BASE_URL}/auction/{auction_id}"
+        auction_url = f"{LEGACY_BASE_URL}/auction/{auction_id}"
         page = session.get(auction_url, timeout=30)
         page.raise_for_status()
         soup = BeautifulSoup(page.text, "html.parser")

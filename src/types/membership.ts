@@ -5,4 +5,6 @@ export interface Membership {
   plan: 'monthly' | 'yearly' | null
   currentPeriodEnd: string | null
   active: boolean
+  accessSource: 'subscription' | 'manual' | null
+  manualAccessUntil: string | null
 }

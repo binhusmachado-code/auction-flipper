@@ -1,7 +1,8 @@
 import Stripe from 'stripe'
-import { adminClient, authenticatedUser, requestOrigin, type ApiRequest, type ApiResponse } from './_lib/server.js'
+import { adminClient, allowAppOrigin, authenticatedUser, requestOrigin, type ApiRequest, type ApiResponse } from './_lib/server.js'
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (!allowAppOrigin(req, res)) return
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
