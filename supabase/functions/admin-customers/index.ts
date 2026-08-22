@@ -99,7 +99,7 @@ async function loadDashboard(admin: SupabaseClient, page: number) {
     ids.length
       ? admin.from('subscriptions').select('user_id, plan, status, current_period_end, cancel_at_period_end').in('user_id', ids)
       : Promise.resolve({ data: [], error: null }),
-    admin.from('source_health').select('source_id, county, status, record_count, last_success_at, error_message').order('updated_at', { ascending: false }).limit(20),
+    admin.from('source_health').select('source_id, county, status, record_count, last_attempt_at, last_success_at, error_message').order('updated_at', { ascending: false }).limit(20),
     admin.from('admin_audit_log').select('id, actor_user_id, target_user_id, action, details, created_at').order('created_at', { ascending: false }).limit(20),
     admin.from('bid_workflows').select('id, user_id, property_id, property_snapshot, status, max_bid, payment_deadline, updated_at').order('updated_at', { ascending: false }).limit(20),
   ])

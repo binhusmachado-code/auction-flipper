@@ -31,6 +31,7 @@ export interface AdminSourceHealth {
   county: string
   status: string
   record_count: number
+  last_attempt_at: string | null
   last_success_at: string | null
   error_message: string | null
 }

@@ -108,6 +108,20 @@ export default function AdminCustomerManager({ ownerId }: { ownerId: string }) {
     bidWorkflows: bidWorkflows.length,
   }), [bidWorkflows.length, customers])
 
+  const sourceStats = useMemo(() => {
+    const latestAttempt = sourceHealth.reduce<string | null>((latest, source) => {
+      if (!source.last_attempt_at) return latest
+      if (!latest || new Date(source.last_attempt_at).getTime() > new Date(latest).getTime()) return source.last_attempt_at
+      return latest
+    }, null)
+    return {
+      live: sourceHealth.filter((source) => source.status === 'live').length,
+      total: sourceHealth.length,
+      records: sourceHealth.reduce((total, source) => total + source.record_count, 0),
+      latestAttempt,
+    }
+  }, [sourceHealth])
+
   const execute = async (payload: Record<string, unknown>) => {
     setWorking(true)
     try {
@@ -226,12 +240,24 @@ export default function AdminCustomerManager({ ownerId }: { ownerId: string }) {
 
       <div className="mt-7 grid gap-7 border-t border-zinc-800 pt-6 lg:grid-cols-2">
         <section aria-labelledby="source-health-title">
-          <h3 id="source-health-title" className="text-sm font-bold text-white">Source health</h3>
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h3 id="source-health-title" className="text-sm font-bold text-white">Auction updater</h3>
+              <p className="mt-1 text-xs text-zinc-600">{sourceStats.records.toLocaleString()} listings checked across {sourceStats.total} official sources</p>
+            </div>
+            <div className="text-right text-xs">
+              <div className={sourceStats.live === sourceStats.total ? 'font-bold text-emerald-400' : 'font-bold text-amber-400'}>{sourceStats.live} of {sourceStats.total} live</div>
+              <div className="mt-1 text-zinc-600">Checked {formatDate(sourceStats.latestAttempt, true)}</div>
+            </div>
+          </div>
           <div className="mt-3 divide-y divide-zinc-800 border-y border-zinc-800">
-            {sourceHealth.slice(0, 6).map((source) => (
-              <div key={source.source_id} className="flex items-center justify-between gap-4 py-3 text-xs">
-                <div><div className="font-semibold text-zinc-300">{source.county}</div><div className="mt-0.5 text-zinc-600">{source.source_id}</div></div>
-                <div className="text-right"><div className={source.status === 'live' ? 'font-bold text-emerald-400' : 'font-bold text-amber-400'}>{source.status}</div><div className="mt-0.5 text-zinc-600">{source.record_count} records</div></div>
+            {sourceHealth.map((source) => (
+              <div key={source.source_id} className="py-3 text-xs">
+                <div className="flex items-center justify-between gap-4">
+                  <div><div className="font-semibold text-zinc-300">{source.county}</div><div className="mt-0.5 text-zinc-600">Last success: {formatDate(source.last_success_at, true)}</div></div>
+                  <div className="text-right"><div className={source.status === 'live' ? 'font-bold text-emerald-400' : 'font-bold text-amber-400'}>{source.status}</div><div className="mt-0.5 text-zinc-600">{source.record_count.toLocaleString()} records</div></div>
+                </div>
+                {source.error_message && <p className="mt-2 leading-relaxed text-amber-300/80">{source.error_message}</p>}
               </div>
             ))}
             {sourceHealth.length === 0 && <div className="py-8 text-center text-xs text-zinc-600">No source-health records yet.</div>}
