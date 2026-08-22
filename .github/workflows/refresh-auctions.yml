@@ -26,6 +26,8 @@ jobs:
           cache-dependency-path: scraper/requirements.txt
       - name: Install scraper dependencies
         run: pip install -r scraper/requirements.txt
+      - name: Install the Broward report browser
+        run: python -m playwright install --with-deps chrome
       - name: Load the protected current snapshot
         env:
           AUCTION_REFRESH_TOKEN: ${{ secrets.AUCTION_REFRESH_TOKEN }}
@@ -38,7 +40,7 @@ jobs:
       - name: Test county parsers
         run: python -m unittest discover -s scraper/tax_deed -p 'test_*_tax_deed.py' -v
       - name: Refresh official county inventory
-        run: python scraper/tax_deed/refresh_tax_deeds.py
+        run: xvfb-run -a python scraper/tax_deed/refresh_tax_deeds.py
       - name: Validate inventory before publishing
         run: |
           python - <<'PY'

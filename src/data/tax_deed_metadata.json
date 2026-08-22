@@ -1,12 +1,12 @@
 {
   "refreshedAt": "2026-08-22",
-  "total": 843,
+  "total": 906,
   "sources": [
     {
       "county": "Broward",
-      "url": "https://broward.realtaxdeed.com/",
-      "count": 15,
-      "status": "cached"
+      "url": "https://county-taxes.net/broward/reports/real-estate",
+      "count": 78,
+      "status": "verified"
     },
     {
       "county": "Brevard",

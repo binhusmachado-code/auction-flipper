@@ -3,6 +3,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 const expectedTokenHash = 'cbd74246419459c30ba4bc413a878f1a8a40d2dba31983a067275cd84b5d5004'
 const allowedSourceHosts = new Set([
   'broward.realtaxdeed.com',
+  'county-taxes.net',
   'www.brevardclerk.us',
   'www.suwgov.org',
   'www.gulfclerk.com',

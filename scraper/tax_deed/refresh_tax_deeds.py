@@ -22,7 +22,7 @@ from suwannee_tax_deed import fetch_upcoming as fetch_suwannee
 
 
 FEEDS: list[tuple[str, str, str, Callable[[], list[dict]]]] = [
-    ("broward-tax-deed-", "Broward", "https://broward.realtaxdeed.com/", fetch_broward),
+    ("broward-tax-deed-", "Broward", "https://county-taxes.net/broward/reports/real-estate", fetch_broward),
     ("brevard-tax-deed-", "Brevard", "https://www.brevardclerk.us/tax-deed-sales", fetch_brevard),
     ("suwannee-tax-deed-", "Suwannee", "https://www.suwgov.org/tax-deed-sales/", fetch_suwannee),
     ("gulf-tax-deed-", "Gulf", "https://www.gulfclerk.com/courts/tax-deeds/", fetch_gulf),

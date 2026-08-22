@@ -1,143 +1,284 @@
 #!/usr/bin/env python3
-"""Fetch upcoming Broward County tax deed parcels from the official auction site."""
+"""Fetch upcoming Broward County tax deed parcels from official public reports."""
+
+from __future__ import annotations
 
 import argparse
 import json
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 
 from shared import HEADERS, base_property, centroid, money, property_type
 
-OFFICIAL_URL = "https://broward.realtaxdeed.com"
-LEGACY_BASE_URL = "https://broward.deedauction.net"
+OFFICIAL_URL = "https://county-taxes.net/broward/reports/real-estate"
+AUCTION_URL = "https://broward.realtaxdeed.com"
 PARCEL_LAYER = "https://gisweb-adapters.bcpa.net/arcgis/rest/services/BCPA_EXTERNAL_JAN26/MapServer/16"
-ADDRESS_LOCATIONS = {
-    "4274 NW 89 AVE": ("Coral Springs", "33065"),
-    "4132 NW 88 AVE": ("Coral Springs", "33065"),
-    "1201 SW 52 AVE": ("North Lauderdale", "33068"),
-    "4771 NW 10 CT": ("Plantation", "33313"),
-    "5864 NW 22 ST": ("Lauderhill", "33313"),
-}
+REPORT_TITLE = re.compile(
+    r"\b([A-Z]+)\s+(\d{1,2}),?\s+(\d{4}),?\s+TAX\s+DEED\s+AUCTION\b",
+    re.IGNORECASE,
+)
 
 
-def detail_fields(html: str) -> dict[str, str]:
-    soup = BeautifulSoup(html, "html.parser")
-    fields: dict[str, str] = {}
-    for row in soup.select("tr"):
-        cells = row.find_all("td")
-        if len(cells) >= 2:
-            fields[cells[0].get_text(" ", strip=True).rstrip(":")] = cells[1].get_text(" ", strip=True)
-    return fields
+def report_sale_date(title: str) -> date | None:
+    """Read the sale date from a named Broward Tax Collector report."""
+    match = REPORT_TITLE.search(re.sub(r"\s+", " ", title).strip())
+    if not match:
+        return None
+    try:
+        return datetime.strptime(
+            f"{match.group(1).title()} {match.group(2)} {match.group(3)}",
+            "%B %d %Y",
+        ).date()
+    except ValueError:
+        return None
 
 
-def fetch_upcoming() -> list[dict]:
-    # Broward migrated from DeedAuction to RealAuction in 2026. The new public
-    # site currently blocks non-browser requests, so do not silently publish
-    # records from the retired platform as newly verified data.
-    raise RuntimeError(f"Broward RealAuction browser adapter is pending for {OFFICIAL_URL}")
+def _report_listing(row: dict[str, str]) -> dict[str, Any] | None:
+    application_number = row.get("Deed Application #", "").strip()
+    parcel_id = row.get("Account Number", "").strip()
+    raw_sale_date = row.get("Deed Sale Date", "").strip()
+    if not application_number or not parcel_id or not raw_sale_date:
+        return None
+    if row.get("Deed Status", "").strip().lower() != "certified":
+        return None
+    try:
+        auction_date = datetime.strptime(raw_sale_date, "%m/%d/%Y").date().isoformat()
+    except ValueError:
+        return None
 
-
-def fetch_legacy_upcoming() -> list[dict]:
-    session = requests.Session()
-    session.headers.update(HEADERS)
-    response = session.post(
-        f"{LEGACY_BASE_URL}/auctions/upcoming",
-        headers={"X-Requested-With": "XMLHttpRequest"},
-        data={"draw": "1", "start": "0", "length": "100"},
-        timeout=30,
+    tax_year = row.get("Tax Yr", "").strip()
+    owner_name = row.get("Owner Name", "").strip()
+    listing = base_property(
+        property_id=f"broward-tax-deed-{application_number.lower()}",
+        address=f"Parcel {parcel_id}",
+        city="Broward County",
+        county="Broward",
+        price=0,
+        auction_date=auction_date,
+        source="Broward Tax Collector Tax Deed Report",
+        source_url=OFFICIAL_URL,
+        description=(
+            f"Official certified Broward Tax Deed application {application_number}"
+            f"{f' for tax year {tax_year}' if tax_year else ''}. "
+            f"Bid through the county auction portal at {AUCTION_URL}. "
+            "The opening bid is not published in this report; verify it before bidding."
+        ),
+        case_number=application_number,
+        parcel_id=parcel_id,
+        owner_name=owner_name,
+        deposit_required=0,
     )
-    response.raise_for_status()
-    properties: list[dict] = []
-    for auction in response.json().get("data", []):
-        auction_id = str(auction["id"])
-        auction_url = f"{LEGACY_BASE_URL}/auction/{auction_id}"
-        page = session.get(auction_url, timeout=30)
-        page.raise_for_status()
-        soup = BeautifulSoup(page.text, "html.parser")
-        sale_date = datetime.strptime(auction["batch_closing_start"][:10], "%Y-%m-%d").date().isoformat()
-        for row in soup.select('tr[id$=".summary"]'):
-            item_id = row.get("id", "").split(".")[0]
-            cells = row.find_all("td")
-            if len(cells) < 3 or not item_id:
-                continue
-            deed_number = cells[1].get_text(" ", strip=True)
-            opening_bid = money(cells[2].get_text(" ", strip=True))
-            details_response = session.get(
-                f"{auction_url}/{item_id}/item_details",
-                headers={"X-Requested-With": "XMLHttpRequest", "Referer": auction_url},
-                timeout=30,
-            )
-            details_response.raise_for_status()
-            details_json = details_response.json()
-            details_html = next((v for k, v in details_json.items() if k.startswith("item_details.")), "")
-            fields = detail_fields(details_html)
-            parcel_id = fields.get("Parcel #", "")
-            situs = fields.get("Situs Address", "")
-            assessed_value = money(fields.get("Assessed / SOH Value", "0"))
-            legal = fields.get("Legal", "")
-            listing = base_property(
-                property_id=f"broward-tax-deed-{deed_number}",
-                address=situs or f"Parcel {parcel_id}",
-                city="Broward County",
-                county="Broward",
-                price=opening_bid,
-                auction_date=sale_date,
-                source="Broward County Tax Deed Auction",
-                source_url=auction_url,
-                description=f"Official upcoming Tax Deed #{deed_number}. Legal description: {legal}",
-                case_number=deed_number,
-                parcel_id=parcel_id,
-            )
-            listing.update({
-                "propertyType": property_type(legal),
-                "assessedValue": assessed_value,
-            })
-            if situs in ADDRESS_LOCATIONS:
-                listing["city"], listing["zip"] = ADDRESS_LOCATIONS[situs]
-            properties.append(listing)
+    listing.update({
+        "openingBid": None,
+        "depositRequired": None,
+        "taxAmount": 0,
+    })
+    return listing
 
-    numeric_folios = {
-        str(property_["parcelId"]).replace("-", ""): property_
-        for property_ in properties
-        if str(property_["parcelId"]).replace("-", "").isdigit()
-    }
-    if numeric_folios:
-        response = session.post(
-            f"{PARCEL_LAYER}/query",
-            data={
-                "f": "json",
-                "where": "FOLIO IN ({})".format(",".join(f"'{folio}'" for folio in numeric_folios)),
-                "outFields": "FOLIO",
-                "returnGeometry": "true",
-                "outSR": "4326",
-            },
-            timeout=60,
+
+def _future_report_rows(today: date) -> list[dict[str, str]]:
+    """Render Grant Street's public report app and return every future certified row."""
+    rows: list[dict[str, str]] = []
+    with sync_playwright() as playwright:
+        # Grant Street's public report is protected by a browser integrity check.
+        # CI supplies a private virtual display so this remains fully unattended.
+        browser = playwright.chromium.launch(channel="chrome", headless=False)
+        context = browser.new_context(
+            locale="en-US",
+            viewport={"width": 1440, "height": 1000},
         )
-        response.raise_for_status()
-        for feature in response.json().get("features", []):
-            listing = numeric_folios.get(str(feature.get("attributes", {}).get("FOLIO", "")))
-            if listing:
-                listing["latitude"], listing["longitude"] = centroid(feature.get("geometry"))
+        page = context.new_page()
+        try:
+            page.goto(OFFICIAL_URL, wait_until="domcontentloaded", timeout=90_000)
+            page.wait_for_selector('iframe[src*="iframe-taxsys"]', timeout=90_000)
+            frame = page.frame(url=re.compile(r"/iframe-taxsys/"))
+            if frame is None:
+                raise RuntimeError("Broward public report frame did not load")
+            frame.wait_for_selector(
+                "#selected-report-filter-menu .dropdown-item",
+                state="attached",
+                timeout=90_000,
+            )
+            reports = frame.locator("#selected-report-filter-menu .dropdown-item").evaluate_all(
+                """elements => elements.map(element => ({
+                    id: element.id,
+                    title: element.textContent.trim()
+                }))"""
+            )
+            future_reports = sorted(
+                (
+                    (sale_date, str(report["id"]), str(report["title"]))
+                    for report in reports
+                    if (sale_date := report_sale_date(str(report["title"]))) is not None
+                    and sale_date >= today
+                ),
+                key=lambda item: (item[0], item[1]),
+            )
+            if not future_reports:
+                raise RuntimeError("Broward published no future Tax Deed Auction reports")
 
-    for listing in properties:
-        folio = str(listing["parcelId"]).replace("-", "")
-        record = session.get(f"https://bcpa.net/RecInfo.asp?URL_Folio={folio}", timeout=30)
-        if record.ok:
-            record_soup = BeautifulSoup(record.text, "html.parser")
-            maps_link = record_soup.select_one('a[href*="google.com/maps/place"]')
-            if maps_link:
-                full_address = maps_link.get_text(" ", strip=True)
-                location_match = re.search(r",\s*([^,]+?)\s+FL\s+(\d{5})", full_address, re.IGNORECASE)
-                if location_match:
-                    listing["city"] = location_match.group(1).strip().title()
-                    listing["zip"] = location_match.group(2)
-        photographs = session.get(f"https://bcpa.net/Photographs.asp?Folio={folio}", timeout=30)
-        if photographs.ok:
+            for sale_date, report_id, title in future_reports:
+                frame.evaluate(
+                    """({ reportId, title }) => {
+                        const report = document.getElementById(reportId);
+                        if (!report) throw new Error(`Report ${reportId} is unavailable`);
+                        document.querySelectorAll('#selected-report-filter-menu .dropdown-item')
+                            .forEach(element => element.classList.remove('active'));
+                        report.classList.add('active');
+                        document.querySelector('#selected_report').value = reportId;
+                        document.querySelector('#selected-report-filter').value = title;
+                        window.view_report();
+                    }""",
+                    {"reportId": report_id, "title": title},
+                )
+                expected_dates = [
+                    f"{sale_date.month}/{sale_date.day}/{str(sale_date.year)[2:]}",
+                    f"{sale_date.month}/{sale_date.day}/{sale_date.year}",
+                ]
+                frame.wait_for_function(
+                    "expected => expected.includes(document.querySelector('#deed_sale_date')?.value)",
+                    arg=expected_dates,
+                    timeout=60_000,
+                )
+                frame.locator("#rows_per_page").evaluate("element => { element.value = '1000'; }")
+                with page.expect_response(
+                    lambda response: response.url.endswith("/report_results")
+                    and response.request.method == "POST",
+                    timeout=90_000,
+                ) as response_info:
+                    frame.locator("#run-search").click()
+                if not response_info.value.ok:
+                    raise RuntimeError(f"Broward report {report_id} search failed")
+                frame.wait_for_function(
+                    """() => {
+                        const results = document.querySelector('#report_results__results');
+                        const hasRows = results && [...results.querySelectorAll('tr')]
+                            .some(row => row.querySelectorAll('td').length > 3);
+                        return hasRows || document.body.innerText.includes('0 search results found');
+                    }""",
+                    timeout=90_000,
+                )
+                result_body = frame.locator("#report_results__results")
+                if result_body.count() == 0:
+                    continue
+                table = result_body.locator("xpath=ancestor::table")
+                headers = table.locator("thead th").evaluate_all(
+                    "elements => elements.map(element => element.textContent.trim())"
+                )
+                for values in result_body.locator("tr").evaluate_all(
+                    "rows => rows.map(row => [...row.querySelectorAll('td')].map(cell => cell.textContent.trim()))"
+                ):
+                    rows.append(dict(zip(headers, values)))
+        finally:
+            context.close()
+            browser.close()
+    return rows
+
+
+def _field_after_label(soup: BeautifulSoup, label: str) -> str:
+    normalized_label = re.sub(r"[^a-z0-9]", "", label.lower())
+    for cell in soup.find_all("td"):
+        cell_label = re.sub(r"[^a-z0-9]", "", cell.get_text(" ", strip=True).lower())
+        if cell_label != normalized_label:
+            continue
+        value_cell = cell.find_next_sibling("td")
+        if value_cell:
+            return re.sub(r"\s+", " ", value_cell.get_text(" ", strip=True)).strip()
+    return ""
+
+
+def parse_appraiser_record(html: str) -> dict[str, Any]:
+    """Extract stable public assessor fields without depending on visual layout."""
+    soup = BeautifulSoup(html, "html.parser")
+    raw_address = _field_after_label(soup, "Property Address")
+    legal = _field_after_label(soup, "Abbreviated Legal Description")
+    address = raw_address
+    city = "Broward County"
+    zip_code = ""
+    match = re.match(r"^(.*?),\s*([^,]+?)\s+FL\s+(\d{5}(?:-\d{4})?)$", raw_address, re.I)
+    if match:
+        address, city, zip_code = (value.strip() for value in match.groups())
+
+    market_value = 0.0
+    assessed_value = 0.0
+    for table in soup.find_all("table"):
+        if "Property Assessment Values" not in table.get_text(" ", strip=True):
+            continue
+        for row in table.find_all("tr"):
+            values = [
+                re.sub(r"\s+", " ", cell.get_text(" ", strip=True))
+                for cell in row.find_all("td", recursive=False)
+            ]
+            if len(values) >= 5 and re.fullmatch(r"20\d{2}", values[0]):
+                market_value = money(values[3])
+                assessed_value = money(values[4])
+                break
+        if market_value or assessed_value:
+            break
+    return {
+        "address": address,
+        "city": city,
+        "zip": zip_code,
+        "legal": legal,
+        "marketValue": market_value,
+        "assessedValue": assessed_value,
+    }
+
+
+def _enrich_from_appraiser(session: requests.Session, properties: list[dict[str, Any]]) -> None:
+    searchable_folios = {
+        str(listing["parcelId"]).replace("-", ""): listing
+        for listing in properties
+        if str(listing["parcelId"]).replace("-", "").isalnum()
+    }
+    folios = list(searchable_folios)
+    for start in range(0, len(folios), 25):
+        batch = folios[start:start + 25]
+        try:
+            response = session.post(
+                f"{PARCEL_LAYER}/query",
+                data={
+                    "f": "json",
+                    "where": "FOLIO IN ({})".format(",".join(f"'{folio}'" for folio in batch)),
+                    "outFields": "FOLIO",
+                    "returnGeometry": "true",
+                    "outSR": "4326",
+                },
+                timeout=60,
+            )
+            response.raise_for_status()
+            for feature in response.json().get("features", []):
+                folio = str(feature.get("attributes", {}).get("FOLIO", ""))
+                listing = searchable_folios.get(folio)
+                if listing:
+                    listing["latitude"], listing["longitude"] = centroid(feature.get("geometry"))
+        except (requests.RequestException, ValueError):
+            print("Broward parcel map enrichment failed; address links remain available.")
+
+    for folio, listing in searchable_folios.items():
+        try:
+            session.cookies.clear()
+            record = session.get(f"https://bcpa.net/RecInfo.asp?URL_Folio={folio}", timeout=30)
+            record.raise_for_status()
+            details = parse_appraiser_record(record.text)
+            if details["address"]:
+                listing["address"] = details["address"]
+                listing["city"] = details["city"]
+                listing["zip"] = details["zip"]
+            listing["propertyType"] = property_type(str(details["legal"]))
+            listing["assessedValue"] = details["assessedValue"]
+            listing["estimatedValue"] = details["marketValue"]
+            listing["valuationVerified"] = bool(details["marketValue"] or details["assessedValue"])
+
+            photographs = session.get(f"https://bcpa.net/Photographs.asp?Folio={folio}", timeout=30)
+            photographs.raise_for_status()
             photograph_soup = BeautifulSoup(photographs.text, "html.parser")
             images = [
                 urljoin(photographs.url, image.get("src", ""))
@@ -146,7 +287,25 @@ def fetch_legacy_upcoming() -> list[dict]:
             if images:
                 listing["imageUrl"] = images[0]
                 listing["images"] = images
-    return properties
+        except requests.RequestException as exc:
+            print(f"Broward appraiser enrichment failed for folio {folio}: {exc}")
+
+
+def fetch_upcoming(today: date | None = None) -> list[dict[str, Any]]:
+    today = today or date.today()
+    properties: dict[str, dict[str, Any]] = {}
+    for row in _future_report_rows(today):
+        listing = _report_listing(row)
+        if listing and listing["auctionDate"] >= today.isoformat():
+            properties[listing["id"]] = listing
+    if not properties:
+        raise RuntimeError("Broward public reports returned no certified future parcels")
+
+    session = requests.Session()
+    session.headers.update(HEADERS)
+    records = list(properties.values())
+    _enrich_from_appraiser(session, records)
+    return sorted(records, key=lambda item: (item["auctionDate"], item["id"]))
 
 
 def main() -> None:
