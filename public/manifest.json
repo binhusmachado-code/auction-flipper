@@ -1,10 +1,10 @@
 {
   "name": "Auction Flipper",
   "short_name": "AuctionFlip",
-  "description": "Find foreclosure, REO, and courthouse auction properties to flip for profit",
+  "description": "Private owner workspace for tax deed and tax lien auction research",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f9fafb",
+  "background_color": "#09090b",
   "theme_color": "#16a34a",
   "orientation": "portrait-primary",
   "icons": [

@@ -97,21 +97,19 @@ export function useSupabaseAuth() {
   return { user, loading }
 }
 
-export function useSupabaseProperties(hasMemberAccess = false) {
+export function useSupabaseProperties(hasPrivateAccess = false) {
   const [properties, setProperties] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
   const { showToast } = useToast()
 
   useEffect(() => {
-    const membershipEnabled = import.meta.env.VITE_MEMBERSHIP_ENABLED === 'true'
-    const publicPreview = officialTaxDeedProperties.slice(0, 3)
-    if (!isSupabaseConfigured) {
-      setProperties(officialTaxDeedProperties)
+    if (!hasPrivateAccess) {
+      setProperties([])
       setLoading(false)
       return
     }
-    if (membershipEnabled && !hasMemberAccess) {
-      setProperties(publicPreview)
+    if (!isSupabaseConfigured) {
+      setProperties(officialTaxDeedProperties)
       setLoading(false)
       return
     }
@@ -125,23 +123,17 @@ export function useSupabaseProperties(hasMemberAccess = false) {
         if (cancelled) return
         if (error) {
           console.warn('Live property data unavailable; using official county listings.', error)
-          setProperties(membershipEnabled ? publicPreview : officialTaxDeedProperties)
+          setProperties(officialTaxDeedProperties)
         } else if (data?.length) {
           const mapped: Property[] = data.map(normalizeProperty)
-          if (membershipEnabled) {
-            setProperties(mapped)
-          } else {
-            const merged = new Map(officialTaxDeedProperties.map((property) => [property.id, property]))
-            mapped.forEach((property) => merged.set(property.id, property))
-            setProperties([...merged.values()])
-          }
+          setProperties(mapped)
         } else {
-          setProperties(membershipEnabled ? publicPreview : officialTaxDeedProperties)
+          setProperties(officialTaxDeedProperties)
         }
         setLoading(false)
       })
     return () => { cancelled = true }
-  }, [hasMemberAccess, showToast])
+  }, [hasPrivateAccess, showToast])
 
   const addProperty = useCallback(async (p: Property) => {
     if (!isSupabaseConfigured) {

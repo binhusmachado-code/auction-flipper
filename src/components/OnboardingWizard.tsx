@@ -18,7 +18,6 @@ import {
   Search,
   ShieldCheck,
   UserCheck,
-  UserPlus,
   WalletCards,
   X,
 } from 'lucide-react'
@@ -27,7 +26,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage'
 interface Props {
   onClose: () => void
   onOpenCalculator: () => void
-  onCreateAccount: () => void
+  onOpenDirectory: () => void
 }
 
 interface Preferences {
@@ -87,7 +86,7 @@ function StepList({ items }: { items: Array<{ title: string; detail: string }> }
   )
 }
 
-export default function OnboardingWizard({ onClose, onOpenCalculator, onCreateAccount }: Props) {
+export default function OnboardingWizard({ onClose, onOpenCalculator, onOpenDirectory }: Props) {
   const [step, setStep] = useState(0)
   const [preferences, setPreferences] = useLocalStorage<Preferences>('auction-hunter-onboarding', {
     experience: '', budget: '', county: '', strategy: '', completed: false,
@@ -229,7 +228,7 @@ export default function OnboardingWizard({ onClose, onOpenCalculator, onCreateAc
               <div className="rounded-lg border border-zinc-800 bg-zinc-950/55 p-4"><FileCheck2 className="h-5 w-5 text-emerald-400" /><div className="mt-3 text-sm font-bold text-zinc-200">Keep the complete file</div><p className="mt-1 text-xs leading-relaxed text-zinc-500">Bid confirmation, payment receipt, county notices, recorded deed, title work, inspection notes, and every cost.</p></div>
               <div className="rounded-lg border border-zinc-800 bg-zinc-950/55 p-4"><ShieldCheck className="h-5 w-5 text-sky-400" /><div className="mt-3 text-sm font-bold text-zinc-200">Plan post-sale work</div><p className="mt-1 text-xs leading-relaxed text-zinc-500">Deed recording, possession, insurance, title or quiet-title work, taxes, utilities, repairs, and your intended exit.</p></div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => { finish(); onCreateAccount() }} className="flex h-12 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 text-sm font-bold text-zinc-950 hover:bg-emerald-400"><UserPlus className="h-4 w-4" />Create your account</button><button type="button" onClick={() => { finish(); onOpenCalculator() }} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 text-sm font-bold text-zinc-200 hover:bg-zinc-700"><Calculator className="h-4 w-4" />Practice the calculator<ExternalLink className="h-4 w-4" /></button></div>
+            <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => { finish(); onOpenDirectory() }} className="flex h-12 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 text-sm font-bold text-zinc-950 hover:bg-emerald-400"><Building2 className="h-4 w-4" />Explore U.S. directory</button><button type="button" onClick={() => { finish(); onOpenCalculator() }} className="flex h-12 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 text-sm font-bold text-zinc-200 hover:bg-zinc-700"><Calculator className="h-4 w-4" />Practice the calculator<ExternalLink className="h-4 w-4" /></button></div>
           </div>}
         </main>
 

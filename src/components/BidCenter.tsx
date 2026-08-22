@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, ArrowUpRight, Calculator, Check, CircleDollarSign, ExternalLink, Gavel, Landmark, Loader2, LockKeyhole, MapPin, ReceiptText, Search, ShieldCheck, UserCheck, WalletCards } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Calculator, Check, CircleDollarSign, ExternalLink, Gavel, Landmark, Loader2, MapPin, ReceiptText, Search, ShieldCheck, UserCheck, WalletCards } from 'lucide-react'
 import type { Property } from '../types/property'
 import type { BidStepKey, BidWorkflow, BidWorkflowStatus } from '../types/bid'
 import { calculateBidReadiness, getBidRules } from '../lib/bidRules'
@@ -10,7 +10,6 @@ interface Props {
   userId: string
   properties: Property[]
   favoriteIds: string[]
-  membershipActive: boolean
   onOpenGuide: () => void
   onOpenCalculator: (property: Property) => void
 }
@@ -45,14 +44,14 @@ const purchaseJourney = [
   { label: 'Pay', icon: ReceiptText, color: 'text-emerald-400' },
 ]
 
-export default function BidCenter({ userId, properties, favoriteIds, membershipActive, onOpenGuide, onOpenCalculator }: Props) {
+export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide, onOpenCalculator }: Props) {
   const { showToast } = useToast()
   const eligibleProperties = useMemo(() => properties
     .filter((property) => property.saleType === 'Tax Deed' || property.saleType === 'Tax Lien')
     .sort((a, b) => Number(favoriteIds.includes(b.id)) - Number(favoriteIds.includes(a.id))), [favoriteIds, properties])
   const [propertyId, setPropertyId] = useState(eligibleProperties[0]?.id ?? '')
   const property = eligibleProperties.find((item) => item.id === propertyId) ?? eligibleProperties[0]
-  const { workflows, loading, save } = useBidWorkflows(userId, membershipActive)
+  const { workflows, loading, save } = useBidWorkflows(userId, true)
   const workflow = property ? workflows[property.id] ?? blankWorkflow(userId, property.id) : null
   const [maxBid, setMaxBid] = useState('')
   const [reference, setReference] = useState('')
@@ -69,10 +68,6 @@ export default function BidCenter({ userId, properties, favoriteIds, membershipA
   }, [propertyId, workflow?.maxBid, workflow?.officialBidReference, workflow?.paymentDeadline, workflow?.paymentConfirmation])
 
   useEffect(() => { setImageFailed(false) }, [propertyId])
-
-  if (!membershipActive) {
-    return <div className="mx-auto max-w-3xl py-16 text-center"><LockKeyhole className="mx-auto h-8 w-8 text-amber-400" /><h3 className="mt-4 text-xl font-extrabold text-white">Bid Center requires active access</h3><p className="mt-2 text-sm text-zinc-500">Activate a membership or ask the owner to grant access.</p></div>
-  }
 
   if (!property || !workflow) {
     return <div className="mx-auto max-w-3xl py-16 text-center"><Gavel className="mx-auto h-8 w-8 text-zinc-600" /><h3 className="mt-4 text-xl font-extrabold text-white">No active auction properties</h3><p className="mt-2 text-sm text-zinc-500">A bid workspace will appear when an official property is available.</p></div>

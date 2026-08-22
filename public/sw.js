@@ -1,4 +1,4 @@
-const CACHE_NAME = 'auction-flipper-v3'
+const CACHE_NAME = 'auction-flipper-v4'
 const SCOPE = self.registration.scope
 const APP_SHELL = [
   SCOPE,

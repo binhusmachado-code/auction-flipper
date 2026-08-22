@@ -1,11 +1,9 @@
-import { useState, useMemo, useEffect } from 'react'
-import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, Calculator, ShieldCheck, UserRound } from 'lucide-react'
+import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
+import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, Calculator, ShieldCheck, Building2, LogOut } from 'lucide-react'
 import { Property, DealFilter } from './types/property'
-import { useLocalStorage } from './hooks/useLocalStorage'
-import { useToast } from './components/ToastProvider.tsx'
 import { useSupabaseAuth, useSupabaseProperties, useSupabaseFavorites } from './hooks/useSupabase.ts'
-import { useMembership } from './hooks/useMembership.ts'
 import { useAccountProfile } from './hooks/useAccount.ts'
+import { supabase } from './lib/supabase.ts'
 import FilterBar from './components/FilterBar'
 import PropertyCard from './components/PropertyCard'
 import MapView from './components/MapView'
@@ -17,6 +15,8 @@ import { isProfitable, dealProfit, marketValue } from './lib/deal.ts'
 import taxDeedMetadata from './data/tax_deed_metadata.json'
 import './index.css'
 
+const USDirectory = lazy(() => import('./components/USDirectory.tsx'))
+
 function formatCurrency(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 }
@@ -27,25 +27,19 @@ function formatAuctionDate(value: string) {
 }
 
 export default function App() {
-  const { showToast } = useToast()
-  const { user } = useSupabaseAuth()
-  const { profile } = useAccountProfile(user?.id ?? null, user?.email ?? '')
-  const membershipEnabled = import.meta.env.VITE_MEMBERSHIP_ENABLED === 'true'
-  const { membership } = useMembership(user?.id ?? null)
-  const { properties: supabaseProperties, loading: propertiesLoading } = useSupabaseProperties(membership.active)
-  const memberDataUserId = !membershipEnabled || membership.active ? user?.id ?? null : null
-  const { favorites: supabaseFavorites, toggleFavorite: toggleSupabaseFavorite } = useSupabaseFavorites(memberDataUserId)
-
-  const [localFavorites, setLocalFavorites] = useLocalStorage<string[]>('favorites', [])
-  const favorites = memberDataUserId ? supabaseFavorites : localFavorites
+  const { user, loading: authLoading } = useSupabaseAuth()
+  const { profile, loading: profileLoading } = useAccountProfile(user?.id ?? null, user?.email ?? '')
+  const hasOwnerAccess = Boolean(user && profile?.role === 'admin' && profile.accountStatus === 'active')
+  const { properties: supabaseProperties, loading: propertiesLoading } = useSupabaseProperties(hasOwnerAccess)
+  const ownerDataUserId = hasOwnerAccess ? user?.id ?? null : null
+  const { favorites, toggleFavorite: toggleSupabaseFavorite } = useSupabaseFavorites(ownerDataUserId)
 
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [calculatorProperty, setCalculatorProperty] = useState<Property | null>(null)
-  const [showAuthModal, setShowAuthModal] = useState(false)
   const [showAccountDashboard, setShowAccountDashboard] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
-  const [view, setView] = useState<'all' | 'favorites' | 'map'>('all')
+  const [view, setView] = useState<'all' | 'favorites' | 'map' | 'directory'>('all')
   const [filter, setFilter] = useState<DealFilter>({
     state: '',
     county: '',
@@ -70,13 +64,10 @@ export default function App() {
 
   useEffect(() => {
     if (!window.location.hash.includes('account')) return
-    if (user && profile) {
-      setShowAuthModal(false)
+    if (hasOwnerAccess) {
       setShowAccountDashboard(true)
-    } else {
-      setShowAuthModal(true)
     }
-  }, [profile, user])
+  }, [hasOwnerAccess])
 
   const properties = supabaseProperties
   const currentProperties = useMemo(() => {
@@ -101,21 +92,7 @@ export default function App() {
   )
 
   const toggleFavorite = async (id: string) => {
-    if (memberDataUserId) {
-      await toggleSupabaseFavorite(id)
-    } else {
-      setLocalFavorites((prev) => {
-        const isAdding = !prev.includes(id)
-        const property = properties.find((p) => p.id === id)
-        if (property) {
-          showToast(
-            isAdding ? `Saved ${property.address}` : `Removed ${property.address}`,
-            isAdding ? 'success' : 'info'
-          )
-        }
-        return isAdding ? [...prev, id] : prev.filter((f) => f !== id)
-      })
-    }
+    if (ownerDataUserId) await toggleSupabaseFavorite(id)
   }
 
   const openGuide = () => {
@@ -200,7 +177,7 @@ export default function App() {
   const lienCount = lienProperties.length
   const deedCount = filtered.filter(p => p.saleType === 'Tax Deed').length
 
-  const navLink = (key: 'all' | 'favorites' | 'map', label: string, icon: React.ReactNode) => (
+  const navLink = (key: 'all' | 'favorites' | 'map' | 'directory', label: string, icon: React.ReactNode) => (
     <button
       key={key}
       onClick={() => { setView(key); setShowGuide(false); setShowMobileMenu(false) }}
@@ -229,6 +206,24 @@ export default function App() {
     </button>
   )
 
+  if (authLoading || (user && profileLoading)) {
+    return <div className="grid min-h-screen place-items-center bg-zinc-950"><div className="flex items-center gap-3 text-sm font-semibold text-zinc-500"><div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />Checking owner access...</div></div>
+  }
+
+  if (!hasOwnerAccess) {
+    if (!user) return <AuthModal />
+    return (
+      <main className="grid min-h-screen place-items-center bg-zinc-950 px-4">
+        <section className="w-full max-w-md rounded-lg border border-amber-500/25 bg-zinc-900 p-7 text-center">
+          <ShieldCheck className="mx-auto h-8 w-8 text-amber-400" />
+          <h1 className="mt-4 text-xl font-extrabold text-white">Owner access only</h1>
+          <p className="mt-2 text-sm text-zinc-500">The signed-in account is not the active owner administrator.</p>
+          <button type="button" onClick={() => void supabase.auth.signOut()} className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-4 text-sm font-bold text-zinc-300 hover:bg-zinc-800"><LogOut className="h-4 w-4" />Sign out</button>
+        </section>
+      </main>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950">
       {/* Floating Nav */}
@@ -246,17 +241,18 @@ export default function App() {
               {navLink('all', 'All', <Search className="w-3.5 h-3.5" />)}
               {navLink('map', 'Map', <MapIcon className="w-3.5 h-3.5" />)}
               {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
+              {navLink('directory', 'US Directory', <Building2 className="w-3.5 h-3.5" />)}
               {guideLink}
             </div>
 
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => user && profile ? setShowAccountDashboard(true) : setShowAuthModal(true)}
-                aria-label={profile?.role === 'admin' ? 'Owner' : user ? 'Dashboard' : 'Membership'}
+                onClick={() => setShowAccountDashboard(true)}
+                aria-label="Owner dashboard"
                 className="pill-btn !px-3 !py-2 text-xs sm:!px-4"
               >
-                {profile?.role === 'admin' ? <ShieldCheck className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">{profile?.role === 'admin' ? 'Owner' : user ? 'Dashboard' : 'Membership'}</span>
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Owner</span>
               </button>
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -273,6 +269,7 @@ export default function App() {
               {navLink('all', 'All Deals', <Search className="w-3.5 h-3.5" />)}
               {navLink('map', 'Map View', <MapIcon className="w-3.5 h-3.5" />)}
               {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
+              {navLink('directory', 'US Directory', <Building2 className="w-3.5 h-3.5" />)}
               {guideLink}
             </div>
           )}
@@ -359,7 +356,7 @@ export default function App() {
           </div>
         </div>
 
-        {upcomingAuctions.length > 0 && (
+        {view !== 'directory' && upcomingAuctions.length > 0 && (
           <section className="mb-8 scroll-mt-28" aria-labelledby="upcoming-auctions-title">
             <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
               <div>
@@ -402,17 +399,7 @@ export default function App() {
           </section>
         )}
 
-        <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />
-
-        {membershipEnabled && !membership.active && (
-          <div className="mb-6 flex flex-col items-start justify-between gap-4 rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-5 sm:flex-row sm:items-center">
-            <div>
-              <div className="text-sm font-bold text-emerald-400">Public preview</div>
-              <p className="mt-1 text-sm text-zinc-400">Sign in with an active membership to open the full supported-county inventory, saved work, and alerts.</p>
-            </div>
-            <button type="button" onClick={() => setShowAuthModal(true)} className="flex-none rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-bold text-zinc-950 hover:bg-emerald-400">View membership</button>
-          </div>
-        )}
+        {view !== 'directory' && <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />}
 
         {propertiesLoading && (
           <div className="flex items-center justify-center py-20">
@@ -425,7 +412,18 @@ export default function App() {
 
         {/* Results */}
         <div className="animate-fade-in" key={view}>
-          {view === 'map' ? (
+          {view === 'directory' ? (
+            <Suspense fallback={<div className="flex items-center justify-center py-20 text-sm font-semibold text-zinc-500"><div className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />Loading U.S. directory...</div>}>
+              <USDirectory
+                properties={currentProperties}
+                onOpenListings={(state, county) => {
+                  setFilter((current) => ({ ...current, state, county }))
+                  setView('all')
+                  window.requestAnimationFrame(() => document.getElementById('deals')?.scrollIntoView({ behavior: 'smooth' }))
+                }}
+              />
+            </Suspense>
+          ) : view === 'map' ? (
             <MapView
               properties={filtered}
               onSelect={setSelectedProperty}
@@ -463,14 +461,15 @@ export default function App() {
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-zinc-100 text-lg">Data Sources</h3>
               <p className="text-sm text-zinc-500 mt-1 max-w-2xl">
-                Listings come from nine official county sources. Broward links to its current auction portal while
-                retaining the last verified snapshot; always recheck status, title, liens, condition, and bid amount.
+                Live listings come from nine county sources. The U.S. directory includes every state and county equivalent,
+                with direct official links where verified and source-research links everywhere else. Always recheck status,
+                title, liens, condition, and bid amount on the government or authorized auction site.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
                 {[
                   { name: 'Bay Tax Deeds', url: 'https://records2.baycoclerk.com/TaxDeed/', desc: 'Official Clerk case search and future sale calendar' },
                   { name: 'Brevard Tax Deeds', url: 'https://www.brevardclerk.us/tax-deed-sales', desc: 'Official sale schedules and bidder information' },
-                  { name: 'Broward Tax Deeds', url: 'https://broward.realtaxdeed.com/', desc: 'Official portal; catalog marks retained data as stale' },
+                  { name: 'Broward Tax Deeds', url: 'https://www.broward.org/RecordsTaxesTreasury/taxcollector/Pages/TaxDeeds.aspx', desc: 'Official county page; catalog marks retained data as stale' },
                   { name: 'Clay Tax Deeds', url: 'https://landmark.clayclerk.com/TaxDeed/', desc: 'Official Clerk case search and future sale calendar' },
                   { name: 'Collier Tax Deeds', url: 'https://notices.collierclerk.com/genre/tax-deeds/', desc: 'Official Clerk legal notices and auction dates' },
                   { name: 'Duval Tax Deeds', url: 'https://taxdeed.duvalclerk.com/', desc: 'Official Clerk case search and future sale calendar' },
@@ -613,16 +612,6 @@ export default function App() {
         </div>
       )}
 
-      {showAuthModal && (
-        <AuthModal
-          onClose={() => setShowAuthModal(false)}
-          onOpenDashboard={() => {
-            setShowAuthModal(false)
-            window.requestAnimationFrame(() => setShowAccountDashboard(true))
-          }}
-        />
-      )}
-
       {showAccountDashboard && user && profile && (
         <AccountDashboard
           user={user}
@@ -644,9 +633,9 @@ export default function App() {
       {showGuide && (
         <OnboardingWizard
           onClose={() => setShowGuide(false)}
-          onCreateAccount={() => {
+          onOpenDirectory={() => {
             setShowGuide(false)
-            setShowAuthModal(true)
+            setView('directory')
           }}
           onOpenCalculator={() => {
             const example = currentProperties[0]
