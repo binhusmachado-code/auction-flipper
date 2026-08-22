@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Bell, BookOpen, Calculator, Gavel, Heart, KeyRound, LayoutDashboard, Loader2, LockKeyhole, LogOut, ShieldCheck, X } from 'lucide-react'
+import { Bell, BookOpen, Calculator, Gavel, Heart, KeyRound, LayoutDashboard, Loader2, LockKeyhole, LogOut, ShieldCheck, UsersRound, X } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { AccountProfile } from '../types/account'
 import type { Property } from '../types/property'
 import { useToast } from './ToastProvider'
+import AdminCustomerManager from './AdminCustomerManager'
 import BidCenter from './BidCenter'
 
 interface Props {
@@ -24,7 +25,7 @@ function formatDate(value: string | null) {
 
 export default function AccountDashboard({ user, profile, properties, favoriteIds, onClose, onOpenGuide, onOpenCalculator }: Props) {
   const { showToast } = useToast()
-  const [tab, setTab] = useState<'account' | 'bid'>('account')
+  const [tab, setTab] = useState<'account' | 'bid' | 'manage'>('account')
   const [counts, setCounts] = useState({ favorites: 0, alerts: 0, scenarios: 0 })
   const [password, setPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
@@ -70,6 +71,7 @@ export default function AccountDashboard({ user, profile, properties, favoriteId
             <nav className="flex gap-2 md:flex-col" aria-label="Dashboard sections">
               <button type="button" onClick={() => setTab('account')} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold md:flex-none ${tab === 'account' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}><LayoutDashboard className="h-4 w-4 flex-none" /><span className="truncate">My account</span></button>
               <button type="button" onClick={() => setTab('bid')} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold md:flex-none ${tab === 'bid' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}><Gavel className="h-4 w-4 flex-none" /><span className="truncate">Bid Center</span></button>
+              <button type="button" onClick={() => setTab('manage')} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-bold md:flex-none ${tab === 'manage' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}><UsersRound className="h-4 w-4 flex-none" /><span className="truncate">Manage</span></button>
             </nav>
             <button type="button" onClick={async () => { await supabase.auth.signOut(); showToast('Signed out', 'info'); onClose() }} className="mt-3 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold text-zinc-500 hover:bg-zinc-800 hover:text-white md:mt-8"><LogOut className="h-4 w-4" />Sign out</button>
           </aside>
@@ -83,6 +85,8 @@ export default function AccountDashboard({ user, profile, properties, favoriteId
                 onOpenGuide={onOpenGuide}
                 onOpenCalculator={onOpenCalculator}
               />
+            ) : tab === 'manage' ? (
+              <AdminCustomerManager ownerId={user.id} />
             ) : (
               <div className="mx-auto max-w-4xl">
                 <div className="flex flex-col justify-between gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-end">
