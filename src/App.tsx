@@ -463,15 +463,20 @@ export default function App() {
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-zinc-100 text-lg">Data Sources</h3>
               <p className="text-sm text-zinc-500 mt-1 max-w-2xl">
-                Broward, Brevard, Suwannee, and Gulf tax deeds link directly to their official county sources.
-                Always verify the current county file, title, liens, condition, and bid amount independently.
+                Listings come from nine official county sources. Broward links to its current auction portal while
+                retaining the last verified snapshot; always recheck status, title, liens, condition, and bid amount.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
                 {[
-                  { name: 'Broward Tax Deeds', url: 'https://broward.realtaxdeed.com/', desc: 'Official Broward County RealAuction tax deed site' },
-                  { name: 'Brevard Tax Deeds', url: 'https://www.brevardclerk.us/tax-deed-sales', desc: 'Official September and October sale schedules' },
-                  { name: 'Suwannee Tax Deeds', url: 'https://www.suwgov.org/tax-deed-sales/', desc: 'Official next-sale schedule and bidder rules' },
+                  { name: 'Bay Tax Deeds', url: 'https://records2.baycoclerk.com/TaxDeed/', desc: 'Official Clerk case search and future sale calendar' },
+                  { name: 'Brevard Tax Deeds', url: 'https://www.brevardclerk.us/tax-deed-sales', desc: 'Official sale schedules and bidder information' },
+                  { name: 'Broward Tax Deeds', url: 'https://broward.realtaxdeed.com/', desc: 'Official portal; catalog marks retained data as stale' },
+                  { name: 'Clay Tax Deeds', url: 'https://landmark.clayclerk.com/TaxDeed/', desc: 'Official Clerk case search and future sale calendar' },
+                  { name: 'Collier Tax Deeds', url: 'https://notices.collierclerk.com/genre/tax-deeds/', desc: 'Official Clerk legal notices and auction dates' },
+                  { name: 'Duval Tax Deeds', url: 'https://taxdeed.duvalclerk.com/', desc: 'Official Clerk case search and future sale calendar' },
                   { name: 'Gulf Tax Deeds', url: 'https://www.gulfclerk.com/courts/tax-deeds/', desc: 'Official active sale listings and reports' },
+                  { name: 'Palm Beach Tax Deeds', url: 'https://taxdeed.mypalmbeachclerk.com/', desc: 'Official Clerk cases joined to public appraiser records' },
+                  { name: 'Suwannee Tax Deeds', url: 'https://www.suwgov.org/tax-deed-sales/', desc: 'Official next-sale schedule and bidder rules' },
                 ].map((s) => (
                   <a
                     key={s.name}
