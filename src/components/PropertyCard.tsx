@@ -126,7 +126,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
               </div>
               <div className="text-lg font-bold text-emerald-400">
                 {property.saleType === 'Tax Lien'
-                  ? `${property.interestRate}%`
+                  ? property.interestRate > 0 ? `${property.interestRate}%` : 'Verify rate'
                   : property.depositRequired !== undefined
                     ? formatCurrency(property.depositRequired)
                     : 'Verify rules'}
@@ -138,7 +138,9 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
                 {property.saleType === 'Tax Lien' ? 'Redemption' : 'Auction Date'}
               </div>
               <div className="text-lg font-bold text-zinc-200">
-                {property.saleType === 'Tax Lien' ? `${property.redemptionPeriod} mo` : (property.auctionDate || 'TBD')}
+                {property.saleType === 'Tax Lien'
+                  ? property.redemptionPeriod > 0 ? `${property.redemptionPeriod} mo` : 'Verify rules'
+                  : (property.auctionDate || 'TBD')}
               </div>
             </div>
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">

@@ -170,9 +170,10 @@ export default function App() {
   // Stats
   const totalTaxOwed = filtered.reduce((s, p) => s + p.price, 0)
   const lienProperties = filtered.filter(p => p.saleType === 'Tax Lien')
-  const avgInterestRate = lienProperties.length > 0
-    ? (lienProperties.reduce((sum, property) => sum + property.interestRate, 0) / lienProperties.length).toFixed(1)
-    : '0'
+  const knownLienRates = lienProperties.filter(property => property.interestRate > 0)
+  const avgInterestRate = knownLienRates.length > 0
+    ? (knownLienRates.reduce((sum, property) => sum + property.interestRate, 0) / knownLienRates.length).toFixed(1)
+    : null
   const lienCount = lienProperties.length
   const deedCount = filtered.filter(p => p.saleType === 'Tax Deed').length
 
@@ -344,7 +345,7 @@ export default function App() {
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
             <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Avg Interest</div>
-            <div className="text-2xl font-extrabold text-emerald-400 mt-1">{avgInterestRate}%</div>
+            <div className="text-2xl font-extrabold text-emerald-400 mt-1">{avgInterestRate ? `${avgInterestRate}%` : 'Verify'}</div>
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
             <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Total Listed Amount</div>
@@ -461,7 +462,7 @@ export default function App() {
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-zinc-100 text-lg">Data Sources</h3>
               <p className="text-sm text-zinc-500 mt-1 max-w-2xl">
-                Live listings come from nine county sources. The U.S. directory includes every state and county equivalent,
+                Live listings come from ten official county inventories. The U.S. directory includes every state and county equivalent,
                 with direct official links where verified and source-research links everywhere else. Always recheck status,
                 title, liens, condition, and bid amount on the government or authorized auction site.
               </p>
@@ -476,6 +477,7 @@ export default function App() {
                   { name: 'Gulf Tax Deeds', url: 'https://www.gulfclerk.com/courts/tax-deeds/', desc: 'Official active sale listings and reports' },
                   { name: 'Palm Beach Tax Deeds', url: 'https://taxdeed.mypalmbeachclerk.com/', desc: 'Official Clerk cases joined to public appraiser records' },
                   { name: 'Suwannee Tax Deeds', url: 'https://www.suwgov.org/tax-deed-sales/', desc: 'Official next-sale schedule and bidder rules' },
+                  { name: 'Adams County Tax Liens', url: 'https://adamscountyco.gov/our-county/elected-officials/treasurer-public-trustee/treasurer-division/tax-lien-sale/', desc: 'Official Colorado county-held lien list joined to weekly assessor records' },
                 ].map((s) => (
                   <a
                     key={s.name}
@@ -536,7 +538,9 @@ export default function App() {
                     {selectedProperty.saleType === 'Tax Lien' ? 'Interest Rate' : 'Auction Date'}
                   </div>
                   <div className="text-lg font-bold text-emerald-400">
-                    {selectedProperty.saleType === 'Tax Lien' ? `${selectedProperty.interestRate}%` : (selectedProperty.auctionDate || 'TBD')}
+                    {selectedProperty.saleType === 'Tax Lien'
+                      ? selectedProperty.interestRate > 0 ? `${selectedProperty.interestRate}%` : 'Verify rate'
+                      : (selectedProperty.auctionDate || 'TBD')}
                   </div>
                 </div>
                 <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
@@ -544,7 +548,9 @@ export default function App() {
                     {selectedProperty.saleType === 'Tax Lien' ? 'Redemption' : 'Est. Min. Deposit'}
                   </div>
                   <div className="text-lg font-bold text-zinc-200">
-                    {selectedProperty.saleType === 'Tax Lien' ? `${selectedProperty.redemptionPeriod} mo` : formatCurrency(selectedProperty.depositRequired ?? 0)}
+                    {selectedProperty.saleType === 'Tax Lien'
+                      ? selectedProperty.redemptionPeriod > 0 ? `${selectedProperty.redemptionPeriod} mo` : 'Verify rules'
+                      : formatCurrency(selectedProperty.depositRequired ?? 0)}
                   </div>
                 </div>
                 <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
@@ -554,7 +560,7 @@ export default function App() {
               </div>
 
               {/* Projected returns */}
-              {selectedProperty.saleType === 'Tax Lien' ? <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10 mb-4">
+              {selectedProperty.saleType === 'Tax Lien' && selectedProperty.interestRate > 0 && selectedProperty.redemptionPeriod > 0 ? <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10 mb-4">
                 <h4 className="text-sm font-bold text-emerald-400 mb-2">Projected Returns</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -575,7 +581,9 @@ export default function App() {
               </div> : <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/20 mb-4">
                 <h4 className="text-sm font-bold text-amber-400 mb-1">Due diligence required</h4>
                 <p className="text-xs leading-relaxed text-zinc-400">
-                  The assessed value is not a resale estimate. Check title, surviving liens, occupancy, land use, condition, and the current county auction file before bidding.
+                  {selectedProperty.saleType === 'Tax Lien'
+                    ? 'The county list does not publish a certificate rate or fixed redemption term. Confirm current availability, payoff, interest, transfer procedure, and redemption status with the Treasurer before purchasing.'
+                    : 'The assessed value is not a resale estimate. Check title, surviving liens, occupancy, land use, condition, and the current county auction file before bidding.'}
                 </p>
               </div>}
 
