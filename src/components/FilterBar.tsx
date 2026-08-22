@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, SlidersHorizontal, X, TrendingUp } from 'lucide-react'
+import { BadgeCheck, CalendarCheck, MapPin, Search, SlidersHorizontal, X } from 'lucide-react'
 import { DealFilter } from '../types/property'
 import { SALE_TYPES, PROPERTY_TYPES, AUCTION_TYPES } from '../data/properties'
 
@@ -32,7 +32,11 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
       minInterestRate: 0,
       maxRedemptionPeriod: 60,
       keyword: '',
-      profitOnly: false,
+      analysisStatus: '',
+      dealGrade: '',
+      verifiedValueOnly: false,
+      mappedOnly: false,
+      auctionDateKnownOnly: false,
       sortBy: 'auction-soonest',
     })
   }
@@ -47,6 +51,12 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
     filter.saleType ||
     filter.auctionType ||
     filter.minInterestRate > 0 ||
+    filter.maxRedemptionPeriod < 60 ||
+    filter.analysisStatus ||
+    filter.dealGrade ||
+    filter.verifiedValueOnly ||
+    filter.mappedOnly ||
+    filter.auctionDateKnownOnly ||
     filter.keyword
 
   return (
@@ -105,23 +115,24 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           <option value="auction-soonest">Auction: soonest</option>
           <option value="price-low">Price: low to high</option>
           <option value="price-high">Price: high to low</option>
-          <option value="assessed-high">Assessed value: high</option>
-          <option value="deal">Estimated profit: high</option>
+          <option value="assessed-high">Verified assessed value: high</option>
+          <option value="rank">Best analyzed deals</option>
+          <option value="deal">Analyzed profit: high</option>
         </select>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-3">
         <button
-          onClick={() => update({ profitOnly: !filter.profitOnly })}
+          onClick={() => update({ analysisStatus: filter.analysisStatus === 'complete' ? '' : 'complete' })}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-            filter.profitOnly
+            filter.analysisStatus === 'complete'
               ? 'bg-emerald-500 text-zinc-950'
               : 'bg-zinc-950 border border-zinc-800/60 text-zinc-400 hover:bg-zinc-800'
           }`}
-          title="Only show properties with a verified positive profit estimate"
+          title="Only show properties with a completed evidence-based analysis"
         >
-          <TrendingUp className="w-4 h-4" />
-          Profit Estimates Only
+          <BadgeCheck className="w-4 h-4" />
+          Analyzed Only
         </button>
 
         <button
@@ -235,6 +246,58 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
               <option value={36}>3 years</option>
             </select>
           </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Analysis Status</label>
+            <select
+              value={filter.analysisStatus}
+              onChange={(e) => update({ analysisStatus: e.target.value as DealFilter['analysisStatus'] })}
+              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+            >
+              <option value="">Any Status</option>
+              <option value="complete">Analysis Complete</option>
+              <option value="needs-work">Analysis Started</option>
+              <option value="not-started">Not Started</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Deal Grade</label>
+            <select
+              value={filter.dealGrade}
+              onChange={(e) => update({ dealGrade: e.target.value as DealFilter['dealGrade'] })}
+              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+            >
+              <option value="">Any Grade</option>
+              <option value="Great">Great</option>
+              <option value="Good">Good</option>
+              <option value="Bad">Bad</option>
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => update({ verifiedValueOnly: !filter.verifiedValueOnly })}
+            className={`flex h-[42px] items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-bold ${filter.verifiedValueOnly ? 'border-emerald-500 bg-emerald-500 text-zinc-950' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+          >
+            <BadgeCheck className="h-4 w-4" />Verified value
+          </button>
+
+          <button
+            type="button"
+            onClick={() => update({ mappedOnly: !filter.mappedOnly })}
+            className={`flex h-[42px] items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-bold ${filter.mappedOnly ? 'border-emerald-500 bg-emerald-500 text-zinc-950' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+          >
+            <MapPin className="h-4 w-4" />Mapped
+          </button>
+
+          <button
+            type="button"
+            onClick={() => update({ auctionDateKnownOnly: !filter.auctionDateKnownOnly })}
+            className={`flex h-[42px] items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-bold ${filter.auctionDateKnownOnly ? 'border-emerald-500 bg-emerald-500 text-zinc-950' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+          >
+            <CalendarCheck className="h-4 w-4" />Sale date known
+          </button>
         </div>
       )}
     </div>

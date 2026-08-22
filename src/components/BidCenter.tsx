@@ -173,7 +173,11 @@ export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide
             <div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-sky-400" /><h4 id="bid-limit-title" className="text-sm font-bold text-white">Maximum bid</h4></div>
             <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]"><label><span className="mb-1.5 block text-xs font-semibold text-zinc-500">Your hard stop</span><div className="relative"><span className="absolute left-3 top-2.5 text-sm text-zinc-500">$</span><input type="number" min="1" step="100" value={maxBid} onChange={(event) => setMaxBid(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 pl-7 pr-3 text-sm text-white outline-none focus:border-emerald-500" /></div></label><button type="button" onClick={saveLimit} disabled={working} className="h-10 self-end rounded-lg bg-sky-500 px-4 text-sm font-bold text-zinc-950 hover:bg-sky-400 disabled:opacity-50">Save limit</button></div>
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs"><span className="text-zinc-500">Opening bid <strong className="text-zinc-300">{property.openingBid !== undefined && property.openingBid > 0 ? money(property.openingBid) : property.price > 0 ? money(property.price) : 'Not posted by county'}</strong></span><span className="text-zinc-500">Estimated deposit <strong className="text-zinc-300">{money(depositEstimate)}</strong></span></div>
-            <button type="button" onClick={() => onOpenCalculator(property)} className="mt-3 flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300"><Calculator className="h-3.5 w-3.5" />Open full maximum-bid calculator</button>
+            {property.saleType === 'Tax Deed' ? (
+              <button type="button" onClick={() => onOpenCalculator(property)} className="mt-3 flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300"><Calculator className="h-3.5 w-3.5" />Open full maximum-bid calculator</button>
+            ) : (
+              <p className="mt-3 text-xs leading-relaxed text-amber-400">A tax lien is a certificate, not a property purchase. Confirm its availability, payoff, rate, and redemption rules with the Treasurer before setting an investment limit.</p>
+            )}
           </section>
 
           <section className="border-t border-zinc-800 py-5" aria-labelledby="official-bid-title">

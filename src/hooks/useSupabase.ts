@@ -60,7 +60,11 @@ function normalizeProperty(row: PropertyRecord): Property {
     assessedValue: Number(row.assessed_value ?? row.assessedValue ?? row.estimated_value ?? row.estimatedValue ?? 0),
     delinquentYears: Number(row.delinquent_years ?? row.delinquentYears ?? 0),
     ownerName: row.owner_name || row.ownerName ? String(row.owner_name ?? row.ownerName) : undefined,
-    valuationVerified: row.valuation_verified === false || row.valuationVerified === false ? false : undefined,
+    valuationVerified: row.valuation_verified === true || row.valuationVerified === true
+      ? true
+      : row.valuation_verified === false || row.valuationVerified === false
+        ? false
+        : undefined,
   }
 }
 

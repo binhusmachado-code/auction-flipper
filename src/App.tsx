@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
-import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, Calculator, ShieldCheck, Building2, LogOut } from 'lucide-react'
+import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, ShieldCheck, Building2, LogOut } from 'lucide-react'
 import { Property, DealFilter } from './types/property'
 import { useSupabaseAuth, useSupabaseProperties, useSupabaseFavorites } from './hooks/useSupabase.ts'
 import { useAccountProfile } from './hooks/useAccount.ts'
@@ -10,8 +10,16 @@ import MapView from './components/MapView'
 import AuthModal from './components/AuthModal.tsx'
 import OnboardingWizard from './components/OnboardingWizard.tsx'
 import DealCalculator from './components/DealCalculator.tsx'
+import PropertyAnalysisModal from './components/PropertyAnalysisModal.tsx'
+import TopDealRanking from './components/TopDealRanking.tsx'
 import AccountDashboard from './components/AccountDashboard.tsx'
-import { isProfitable, dealProfit, marketValue } from './lib/deal.ts'
+import { analyzeTaxDeedScenario } from './lib/calculator.ts'
+import {
+  dealAnalysisStorageKey,
+  getDealVerdict,
+  rankDealAnalyses,
+  type StoredDealAnalysis,
+} from './lib/propertyAnalysis.ts'
 import taxDeedMetadata from './data/tax_deed_metadata.json'
 import './index.css'
 
@@ -52,7 +60,11 @@ export default function App() {
     minInterestRate: 0,
     maxRedemptionPeriod: 60,
     keyword: '',
-    profitOnly: false,
+    analysisStatus: '',
+    dealGrade: '',
+    verifiedValueOnly: false,
+    mappedOnly: false,
+    auctionDateKnownOnly: false,
     sortBy: 'auction-soonest',
   })
 
@@ -90,6 +102,33 @@ export default function App() {
     () => [...new Set(currentProperties.map((property) => property.state).filter(Boolean))].sort(),
     [currentProperties]
   )
+  const [savedAnalyses, setSavedAnalyses] = useState<Record<string, StoredDealAnalysis>>({})
+
+  useEffect(() => {
+    const loaded: Record<string, StoredDealAnalysis> = {}
+    currentProperties.forEach((property) => {
+      try {
+        const raw = window.localStorage.getItem(dealAnalysisStorageKey(property.id))
+        if (!raw) return
+        const scenario = JSON.parse(raw)
+        if (!scenario || typeof scenario !== 'object') return
+        loaded[property.id] = { propertyId: property.id, address: property.address, scenario }
+      } catch {
+        // Ignore a damaged local draft instead of presenting calculations from it.
+      }
+    })
+    setSavedAnalyses(loaded)
+  }, [currentProperties])
+
+  const rankedAnalyses = useMemo(() => rankDealAnalyses(Object.values(savedAnalyses)), [savedAnalyses])
+  const rankById = useMemo(
+    () => new Map(rankedAnalyses.map((record, index) => [record.propertyId, index + 1])),
+    [rankedAnalyses]
+  )
+
+  const saveAnalysis = (record: StoredDealAnalysis) => {
+    setSavedAnalyses((current) => ({ ...current, [record.propertyId]: record }))
+  }
 
   const toggleFavorite = async (id: string) => {
     if (ownerDataUserId) await toggleSupabaseFavorite(id)
@@ -105,7 +144,16 @@ export default function App() {
     if (view === 'favorites') list = list.filter((p) => favorites.includes(p.id))
 
     return list.filter((p) => {
-      if (filter.profitOnly && marketValue(p) > 0 && !isProfitable(p)) return false
+      const saved = savedAnalyses[p.id]
+      const analysis = saved ? analyzeTaxDeedScenario(saved.scenario) : null
+      const grade = analysis && saved ? getDealVerdict(analysis, saved.scenario).grade : 'Not ready'
+      if (filter.analysisStatus === 'complete' && !analysis?.complete) return false
+      if (filter.analysisStatus === 'needs-work' && (!saved || analysis?.complete)) return false
+      if (filter.analysisStatus === 'not-started' && saved) return false
+      if (filter.dealGrade && grade !== filter.dealGrade) return false
+      if (filter.verifiedValueOnly && (!p.valuationVerified || !(p.estimatedValue > 0 || p.assessedValue > 0))) return false
+      if (filter.mappedOnly && !(p.latitude && p.longitude)) return false
+      if (filter.auctionDateKnownOnly && !p.auctionDate) return false
       if (filter.state && p.state !== filter.state) return false
       if (filter.county && p.county !== filter.county) return false
       if (filter.city && p.city !== filter.city) return false
@@ -115,7 +163,7 @@ export default function App() {
       if (p.price < filter.minPrice) return false
       if (p.price > filter.maxPrice) return false
       if (p.interestRate < filter.minInterestRate) return false
-      if (p.redemptionPeriod > filter.maxRedemptionPeriod) return false
+      if (filter.maxRedemptionPeriod < 60 && (p.redemptionPeriod <= 0 || p.redemptionPeriod > filter.maxRedemptionPeriod)) return false
       if (filter.keyword) {
         const kw = filter.keyword.toLowerCase()
         const match =
@@ -135,13 +183,24 @@ export default function App() {
         if (aHasPrice !== bHasPrice) return aHasPrice ? -1 : 1
         return filter.sortBy === 'price-low' ? a.price - b.price : b.price - a.price
       }
-      if (filter.sortBy === 'assessed-high') return b.assessedValue - a.assessedValue
-      if (filter.sortBy === 'deal') return dealProfit(b) - dealProfit(a)
+      if (filter.sortBy === 'assessed-high') {
+        const aValue = a.valuationVerified ? a.assessedValue : -Infinity
+        const bValue = b.valuationVerified ? b.assessedValue : -Infinity
+        return bValue - aValue
+      }
+      if (filter.sortBy === 'rank') return (rankById.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rankById.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+      if (filter.sortBy === 'deal') {
+        const aSaved = savedAnalyses[a.id]
+        const bSaved = savedAnalyses[b.id]
+        const aProfit = aSaved ? analyzeTaxDeedScenario(aSaved.scenario).projectedProfit ?? -Infinity : -Infinity
+        const bProfit = bSaved ? analyzeTaxDeedScenario(bSaved.scenario).projectedProfit ?? -Infinity : -Infinity
+        return bProfit - aProfit
+      }
       const aDate = a.auctionDate ? new Date(`${a.auctionDate}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER
       const bDate = b.auctionDate ? new Date(`${b.auctionDate}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER
       return aDate - bDate || a.price - b.price
     })
-  }, [currentProperties, favorites, view, filter])
+  }, [currentProperties, favorites, view, filter, rankById, savedAnalyses])
 
   const upcomingAuctions = useMemo(() => {
     const today = new Date()
@@ -400,6 +459,14 @@ export default function App() {
           </section>
         )}
 
+        {view !== 'directory' && (
+          <TopDealRanking
+            ranked={rankedAnalyses}
+            properties={currentProperties}
+            onOpen={setSelectedProperty}
+          />
+        )}
+
         {view !== 'directory' && <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />}
 
         {propertiesLoading && (
@@ -447,6 +514,8 @@ export default function App() {
                   onSelect={setSelectedProperty}
                   onToggleFavorite={toggleFavorite}
                   isFavorite={favorites.includes(p.id)}
+                  savedAnalysis={savedAnalyses[p.id]}
+                  rank={rankById.get(p.id)}
                 />
               ))}
             </div>
@@ -511,113 +580,16 @@ export default function App() {
 
       {/* Modals */}
       {selectedProperty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setSelectedProperty(null)}>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white">Investment Analysis</h2>
-                <button aria-label="Close analysis" onClick={() => setSelectedProperty(null)} className="p-2 text-zinc-500 hover:text-white transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              
-              <div className="mb-4">
-                <h3 className="font-bold text-zinc-200">{selectedProperty.address}</h3>
-                <p className="text-sm text-zinc-500">{selectedProperty.city}, {selectedProperty.state} {selectedProperty.zip}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                    {selectedProperty.saleType === 'Tax Lien' ? 'Tax Owed' : 'Opening Bid'}
-                  </div>
-                  <div className="text-lg font-bold text-emerald-400">{formatCurrency(selectedProperty.price)}</div>
-                </div>
-                <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                    {selectedProperty.saleType === 'Tax Lien' ? 'Interest Rate' : 'Auction Date'}
-                  </div>
-                  <div className="text-lg font-bold text-emerald-400">
-                    {selectedProperty.saleType === 'Tax Lien'
-                      ? selectedProperty.interestRate > 0 ? `${selectedProperty.interestRate}%` : 'Verify rate'
-                      : (selectedProperty.auctionDate || 'TBD')}
-                  </div>
-                </div>
-                <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
-                    {selectedProperty.saleType === 'Tax Lien' ? 'Redemption' : 'Est. Min. Deposit'}
-                  </div>
-                  <div className="text-lg font-bold text-zinc-200">
-                    {selectedProperty.saleType === 'Tax Lien'
-                      ? selectedProperty.redemptionPeriod > 0 ? `${selectedProperty.redemptionPeriod} mo` : 'Verify rules'
-                      : formatCurrency(selectedProperty.depositRequired ?? 0)}
-                  </div>
-                </div>
-                <div className="bg-zinc-950 rounded-xl p-3 border border-zinc-800">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider">Assessed Value</div>
-                  <div className="text-lg font-bold text-zinc-200">{formatCurrency(selectedProperty.assessedValue)}</div>
-                </div>
-              </div>
-
-              {/* Projected returns */}
-              {selectedProperty.saleType === 'Tax Lien' && selectedProperty.interestRate > 0 && selectedProperty.redemptionPeriod > 0 ? <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10 mb-4">
-                <h4 className="text-sm font-bold text-emerald-400 mb-2">Projected Returns</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400">Annual interest earned:</span>
-                    <span className="text-white font-bold">{formatCurrency(selectedProperty.price * selectedProperty.interestRate / 100)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400">Total over {selectedProperty.redemptionPeriod} months:</span>
-                    <span className="text-emerald-400 font-bold">
-                      {formatCurrency(selectedProperty.price * selectedProperty.interestRate / 100 * selectedProperty.redemptionPeriod / 12)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-400">ROI (annualized):</span>
-                    <span className="text-emerald-400 font-bold">{selectedProperty.interestRate}%</span>
-                  </div>
-                </div>
-              </div> : <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/20 mb-4">
-                <h4 className="text-sm font-bold text-amber-400 mb-1">Due diligence required</h4>
-                <p className="text-xs leading-relaxed text-zinc-400">
-                  {selectedProperty.saleType === 'Tax Lien'
-                    ? 'The county list does not publish a certificate rate or fixed redemption term. Confirm current availability, payoff, interest, transfer procedure, and redemption status with the Treasurer before purchasing.'
-                    : 'The assessed value is not a resale estimate. Check title, surviving liens, occupancy, land use, condition, and the current county auction file before bidding.'}
-                </p>
-              </div>}
-
-              {selectedProperty.parcelId && (
-                <div className="text-xs text-zinc-500 mb-2">
-                  Parcel ID: <span className="text-zinc-300 font-mono">{selectedProperty.parcelId}</span>
-                </div>
-              )}
-              {selectedProperty.description && (
-                <p className="text-xs text-zinc-500 leading-relaxed">{selectedProperty.description}</p>
-              )}
-              
-              <a
-                href={selectedProperty.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 w-full flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold rounded-xl transition-all"
-              >
-                View Source Data
-                <ArrowUpRight className="w-4 h-4" />
-              </a>
-              {selectedProperty.saleType === 'Tax Deed' && (
-                <button
-                  type="button"
-                  onClick={() => { setCalculatorProperty(selectedProperty); setSelectedProperty(null) }}
-                  className="mt-2 w-full flex items-center justify-center gap-2 py-3 border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold rounded-xl transition-all"
-                >
-                  <Calculator className="w-4 h-4" />
-                  Calculate Maximum Bid
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <PropertyAnalysisModal
+          property={selectedProperty}
+          savedAnalysis={savedAnalyses[selectedProperty.id]}
+          rank={rankById.get(selectedProperty.id)}
+          onClose={() => setSelectedProperty(null)}
+          onOpenCalculator={() => {
+            setCalculatorProperty(selectedProperty)
+            setSelectedProperty(null)
+          }}
+        />
       )}
 
       {showAccountDashboard && user && profile && (
@@ -646,14 +618,14 @@ export default function App() {
             setView('directory')
           }}
           onOpenCalculator={() => {
-            const example = currentProperties[0]
+            const example = currentProperties.find((property) => property.saleType === 'Tax Deed')
             if (example) setCalculatorProperty(example)
           }}
         />
       )}
 
-      {calculatorProperty && (
-        <DealCalculator property={calculatorProperty} onClose={() => setCalculatorProperty(null)} />
+      {calculatorProperty?.saleType === 'Tax Deed' && (
+        <DealCalculator property={calculatorProperty} onClose={() => setCalculatorProperty(null)} onSaved={saveAnalysis} />
       )}
     </div>
   )

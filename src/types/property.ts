@@ -60,18 +60,10 @@ export interface DealFilter {
   minInterestRate: number;
   maxRedemptionPeriod: number;
   keyword: string;
-  profitOnly: boolean;
-  sortBy: 'auction-soonest' | 'price-low' | 'price-high' | 'assessed-high' | 'deal';
-}
-
-export interface FlipAnalysis {
-  purchasePrice: number;
-  rehabCost: number;
-  arv: number;
-  closingCosts: number;
-  holdingCosts: number;
-  sellingCosts: number;
-  profit: number;
-  roi: number;
-  cashOnCash: number;
+  analysisStatus: '' | 'complete' | 'needs-work' | 'not-started';
+  dealGrade: '' | 'Great' | 'Good' | 'Bad';
+  verifiedValueOnly: boolean;
+  mappedOnly: boolean;
+  auctionDateKnownOnly: boolean;
+  sortBy: 'auction-soonest' | 'price-low' | 'price-high' | 'assessed-high' | 'deal' | 'rank';
 }

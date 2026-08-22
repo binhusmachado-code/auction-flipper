@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { MapPin, Heart, ArrowUpRight, Tag, Percent, Clock, DollarSign, FileText, Building, Sparkles } from 'lucide-react'
+import { MapPin, Heart, ArrowUpRight, Tag, Percent, Clock, DollarSign, FileText, Building, ShieldAlert, Trophy } from 'lucide-react'
 import { Property } from '../types/property'
-import { dealProfit, dealScore, isProfitable } from '../lib/deal'
+import { analyzeTaxDeedScenario } from '../lib/calculator'
+import { getDealVerdict, type StoredDealAnalysis } from '../lib/propertyAnalysis'
 import PropertyMedia from './PropertyMedia'
 
 interface Props {
@@ -9,6 +10,8 @@ interface Props {
   onSelect: (p: Property) => void
   onToggleFavorite: (id: string) => void
   isFavorite: boolean
+  savedAnalysis?: StoredDealAnalysis
+  rank?: number
 }
 
 function formatCurrency(n: number) {
@@ -25,7 +28,7 @@ function getSaleTypeColor(saleType: string) {
   return 'bg-sky-500/10 text-sky-400 ring-sky-500/20'
 }
 
-export default function PropertyCard({ property, onSelect, onToggleFavorite, isFavorite }: Props) {
+export default function PropertyCard({ property, onSelect, onToggleFavorite, isFavorite, savedAnalysis, rank }: Props) {
   const [isVisible, setIsVisible] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -43,13 +46,8 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
     return () => observer.disconnect()
   }, [])
 
-  const discountPct = property.assessedValue > 0
-    ? Math.round((1 - property.price / property.assessedValue) * 100)
-    : 0
-
-  const profit = dealProfit(property)
-  const score = dealScore(property)
-  const profitable = isProfitable(property)
+  const analysis = savedAnalysis ? analyzeTaxDeedScenario(savedAnalysis.scenario) : null
+  const verdict = analysis && savedAnalysis ? getDealVerdict(analysis, savedAnalysis.scenario) : null
   const displaySaleType = property.saleType ?? property.auctionType
 
   return (
@@ -63,6 +61,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
         {/* Header bar */}
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-zinc-800/60">
           <div className="flex min-w-0 items-center gap-2">
+            {rank && <span className="inline-flex items-center gap-1 rounded-md bg-amber-400 px-2 py-1 text-[10px] font-black text-zinc-950"><Trophy className="h-3 w-3" />#{rank}</span>}
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-full ring-1 ${getSaleTypeColor(displaySaleType)}`}>
               <Tag className="w-3 h-3" />
               {displaySaleType}
@@ -149,33 +148,24 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
                 Assessed Value
               </div>
               <div className="text-lg font-bold text-zinc-200">
-                {property.assessedValue > 0 ? formatCurrency(property.assessedValue) : 'Not verified'}
+                {property.valuationVerified && property.assessedValue > 0 ? formatCurrency(property.assessedValue) : 'Not verified'}
               </div>
             </div>
           </div>
 
           {/* Deal summary */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <div className="flex items-center gap-3 flex-wrap">
-              {property.valuationVerified === false ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 text-amber-400 text-xs font-bold rounded-lg border border-amber-500/20">
-                  Needs due diligence
-                </span>
-              ) : profitable ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/20">
-                  <Sparkles className="w-3 h-3" />
-                  Est. Profit {formatCurrency(profit)}
-                </span>
-              ) : (
-                discountPct > 0 && (
-                  <span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/20">
-                    {discountPct}% Below Market
+              {analysis?.complete && verdict ? (
+                <>
+                  <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${verdict.grade === 'Great' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : verdict.grade === 'Good' ? 'border-sky-500/30 bg-sky-500/10 text-sky-400' : 'border-red-500/30 bg-red-500/10 text-red-400'}`}>
+                    {verdict.grade} deal
                   </span>
-                )
-              )}
-              {profitable && score > 0 && (
-                <span className="text-xs" title={`Deal score ${score}/5`}>
-                  {'⭐'.repeat(score)}
+                  <span className="text-xs font-bold text-zinc-300">Approx. profit {formatCurrency(analysis.projectedProfit ?? 0)}</span>
+                </>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-400">
+                  <ShieldAlert className="h-3.5 w-3.5" />Needs due diligence
                 </span>
               )}
               {property.delinquentYears > 0 && (
@@ -184,6 +174,19 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
                 </span>
               )}
             </div>
+            {analysis?.complete ? (
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+                <span>Max bid <strong className="text-zinc-300">{formatCurrency(analysis.maximumBid ?? 0)}</strong></span>
+                <span>Repairs <strong className="text-zinc-300">{formatCurrency(analysis.repairs)}</strong></span>
+                <span>All costs <strong className="text-zinc-300">{formatCurrency(analysis.totalProjectCost + analysis.sellingCosts)}</strong></span>
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                {property.saleType === 'Tax Lien'
+                  ? 'Check certificate availability, rate, redemption rules, title, and payoff.'
+                  : 'Check value, title and liens, condition, repairs, fees, occupancy, and auction rules.'}
+              </p>
+            )}
             {property.waterDebtOnly === 'YES' && (
               <span className="text-[10px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20">
                 Water Debt Only
@@ -204,7 +207,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
               onClick={() => onSelect(property)}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-bold rounded-xl transition-all duration-300 active:scale-[0.98] group/btn"
             >
-              Research
+              Full analysis
               <span className="transition-transform duration-300 group-hover/btn:translate-x-0.5">
                 <ArrowUpRight className="w-4 h-4" />
               </span>
