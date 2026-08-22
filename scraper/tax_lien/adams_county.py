@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import re
+import time
 from datetime import date
 from urllib.parse import urljoin
 
@@ -73,20 +74,29 @@ def _query_arcgis(
     session: requests.Session,
 ) -> list[dict]:
     features: list[dict] = []
-    for batch in _chunks(values):
+    for batch in _chunks(values, 20 if geometry else 75):
         quoted = ",".join(f"'{value.replace(chr(39), chr(39) * 2)}'" for value in batch)
-        response = session.get(
-            url,
-            params={
-                "where": f"{field} IN ({quoted})",
-                "outFields": "*",
-                "returnGeometry": "false",
-                "returnCentroid": str(geometry).lower(),
-                "outSR": "4326",
-                "f": "json",
-            },
-            timeout=60,
-        )
+        params = {
+            "where": f"{field} IN ({quoted})",
+            "outFields": (
+                "PARCELNB,concataddr1,concataddr2,loccity,loczip,ownernamefull,legal"
+                if geometry else
+                "accountno,parcelnb,acttotalval,asdtotalval,lotsize,accttype,vacimp"
+            ),
+            "returnGeometry": "false",
+            "returnCentroid": str(geometry).lower(),
+            "outSR": "4326",
+            "f": "json",
+        }
+        for attempt in range(2):
+            try:
+                response = session.get(url, params=params, timeout=20)
+                if response.status_code not in {502, 503, 504} or attempt == 1:
+                    break
+            except requests.RequestException:
+                if attempt == 1:
+                    raise
+            time.sleep(2 ** attempt)
         response.raise_for_status()
         payload = response.json()
         if payload.get("error"):
@@ -200,7 +210,11 @@ def fetch_county_held(session: requests.Session | None = None) -> tuple[list[dic
         if date_match else date.today().isoformat()
     )
     account_ids = [row["accountId"] for row in rows]
-    values = _query_arcgis(VALUES_QUERY, "accountno", account_ids, session=session)
+    try:
+        values = _query_arcgis(VALUES_QUERY, "accountno", account_ids, session=session)
+    except (requests.RequestException, RuntimeError) as exc:
+        print(f"Adams County value enrichment unavailable: {exc}")
+        values = []
     values_by_account = {
         str(feature.get("attributes", {}).get("accountno")): feature.get("attributes", {})
         for feature in values
@@ -208,7 +222,11 @@ def fetch_county_held(session: requests.Session | None = None) -> tuple[list[dic
     parcel_numbers = [
         str(value.get("parcelnb")) for value in values_by_account.values() if value.get("parcelnb")
     ]
-    parcels = _query_arcgis(PARCELS_QUERY, "PARCELNB", parcel_numbers, geometry=True, session=session)
+    try:
+        parcels = _query_arcgis(PARCELS_QUERY, "PARCELNB", parcel_numbers, geometry=True, session=session)
+    except (requests.RequestException, RuntimeError) as exc:
+        print(f"Adams County parcel enrichment unavailable: {exc}")
+        parcels = []
     parcels_by_number = {
         str(feature.get("attributes", {}).get("PARCELNB")): feature for feature in parcels
     }
@@ -229,5 +247,6 @@ def fetch_county_held(session: requests.Session | None = None) -> tuple[list[dic
         "documentUrl": pdf_url,
         "matchedParcels": sum(bool(listing["parcelId"]) for listing in listings),
         "mappedParcels": sum(bool(listing["latitude"]) for listing in listings),
+        "assessorStatus": "verified" if values and parcels else "unavailable",
     }
     return listings, metadata

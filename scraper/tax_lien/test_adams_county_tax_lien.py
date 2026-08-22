@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from adams_county import build_listing, discover_county_held_pdf, parse_county_held_lien_text
+from refresh_tax_liens import merge_existing_enrichment
 
 
 class AdamsCountyTaxLienTests(unittest.TestCase):
@@ -47,6 +48,25 @@ class AdamsCountyTaxLienTests(unittest.TestCase):
         self.assertEqual(listing["interestRate"], 0)
         self.assertEqual(listing["redemptionPeriod"], 0)
         self.assertIn("Confirm availability", listing["notes"])
+
+    def test_last_verified_enrichment_is_kept_when_assessor_is_unavailable(self) -> None:
+        fresh = {
+            "address": "Account R0008422", "city": "Adams County", "zip": "", "parcelId": "",
+            "ownerName": "", "imageUrl": "", "images": [], "latitude": 0, "longitude": 0,
+            "lotSize": None, "propertyType": "Unknown", "assessedValue": 0, "estimatedValue": 0,
+            "arv": 0, "valuationVerified": False, "description": "Current balance is $110.78.",
+        }
+        existing = {
+            "address": "9910 E 157TH AVE", "city": "Brighton", "zip": "80601",
+            "parcelId": "0157110014001", "latitude": 39.98, "longitude": -104.87,
+            "assessedValue": 51100, "estimatedValue": 196541, "valuationVerified": True,
+            "description": "Old balance. Legal description: EXAMPLE LEGAL.",
+        }
+        merged = merge_existing_enrichment(fresh, existing)
+        self.assertEqual(merged["address"], "9910 E 157TH AVE")
+        self.assertEqual(merged["parcelId"], "0157110014001")
+        self.assertEqual(merged["estimatedValue"], 196541)
+        self.assertIn("EXAMPLE LEGAL", merged["description"])
 
 
 if __name__ == "__main__":

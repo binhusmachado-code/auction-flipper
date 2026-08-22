@@ -27,6 +27,7 @@ PAYLOAD_JSON="${WORK_DIR}/payload.json"
 RESULT_JSON="${WORK_DIR}/result.json"
 EDGE_URL="https://dlnurzizylroqchedfbf.supabase.co/functions/v1/refresh-tax-deeds"
 LIEN_RECORDS_JSON="${WORK_DIR}/tax-liens.json"
+LIEN_CURRENT_JSON="${WORK_DIR}/current-tax-liens.json"
 LIEN_METADATA_JSON="${WORK_DIR}/tax-lien-metadata.json"
 LIEN_PAYLOAD_JSON="${WORK_DIR}/tax-lien-payload.json"
 LIEN_RESULT_JSON="${WORK_DIR}/tax-lien-result.json"
@@ -68,6 +69,13 @@ curl --config <(printf 'header = "x-refresh-token: %s"\n' "$TOKEN") \
   > "$RESULT_JSON"
 jq -e '.ok == true' "$RESULT_JSON" >/dev/null
 jq '{ok, result}' "$RESULT_JSON"
+
+curl --config <(printf 'header = "x-refresh-token: %s"\n' "$TOKEN") \
+  --fail --silent --show-error \
+  "$LIEN_EDGE_URL" \
+  > "$LIEN_CURRENT_JSON"
+jq -e '.records | type == "array" and length >= 25' "$LIEN_CURRENT_JSON" >/dev/null
+jq '.records' "$LIEN_CURRENT_JSON" > "$LIEN_RECORDS_JSON"
 
 python3 scraper/tax_lien/refresh_tax_liens.py \
   --output "$LIEN_RECORDS_JSON" \

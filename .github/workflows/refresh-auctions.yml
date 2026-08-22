@@ -74,7 +74,15 @@ jobs:
             --data-binary @/tmp/auction-refresh.json \
             "https://dlnurzizylroqchedfbf.supabase.co/functions/v1/refresh-tax-deeds"
       - name: Refresh official county-held tax liens
+        env:
+          AUCTION_REFRESH_TOKEN: ${{ secrets.AUCTION_REFRESH_TOKEN }}
         run: |
+          curl --fail --silent --show-error \
+            -H "x-refresh-token: ${AUCTION_REFRESH_TOKEN}" \
+            "https://dlnurzizylroqchedfbf.supabase.co/functions/v1/refresh-tax-liens" \
+            > /tmp/current-tax-liens.json
+          jq -e '.records | type == "array" and length >= 25' /tmp/current-tax-liens.json >/dev/null
+          jq '.records' /tmp/current-tax-liens.json > /tmp/tax-liens.json
           python scraper/tax_lien/refresh_tax_liens.py \
             --output /tmp/tax-liens.json \
             --metadata-output /tmp/tax-lien-metadata.json
