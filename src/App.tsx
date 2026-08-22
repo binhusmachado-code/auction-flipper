@@ -173,7 +173,6 @@ export default function App() {
   const avgInterestRate = lienProperties.length > 0
     ? (lienProperties.reduce((sum, property) => sum + property.interestRate, 0) / lienProperties.length).toFixed(1)
     : '0'
-  const statesCount = new Set(filtered.map(p => p.state)).size
   const lienCount = lienProperties.length
   const deedCount = filtered.filter(p => p.saleType === 'Tax Deed').length
 
@@ -241,7 +240,7 @@ export default function App() {
               {navLink('all', 'All', <Search className="w-3.5 h-3.5" />)}
               {navLink('map', 'Map', <MapIcon className="w-3.5 h-3.5" />)}
               {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
-              {navLink('directory', 'US Directory', <Building2 className="w-3.5 h-3.5" />)}
+              {navLink('directory', 'Nationwide', <Building2 className="w-3.5 h-3.5" />)}
               {guideLink}
             </div>
 
@@ -269,7 +268,7 @@ export default function App() {
               {navLink('all', 'All Deals', <Search className="w-3.5 h-3.5" />)}
               {navLink('map', 'Map View', <MapIcon className="w-3.5 h-3.5" />)}
               {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
-              {navLink('directory', 'US Directory', <Building2 className="w-3.5 h-3.5" />)}
+              {navLink('directory', 'Nationwide', <Building2 className="w-3.5 h-3.5" />)}
               {guideLink}
             </div>
           )}
@@ -296,6 +295,7 @@ export default function App() {
               { name: 'Tax Liens', count: lienCount, color: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
               { name: 'Tax Deeds', count: deedCount, color: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
               { name: 'Active Listings', count: currentProperties.length, color: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
+              { name: 'States + DC', count: 51, color: 'bg-zinc-800 text-zinc-300 ring-zinc-700' },
             ].map((s) => (
               <div
                 key={s.name}
@@ -351,8 +351,8 @@ export default function App() {
             <div className="text-2xl font-extrabold text-white mt-1">{formatCurrency(totalTaxOwed)}</div>
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">{view === 'directory' ? 'States + DC' : 'Listing States'}</div>
-            <div className="text-2xl font-extrabold text-white mt-1">{view === 'directory' ? 51 : statesCount}</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">States + DC</div>
+            <div className="text-2xl font-extrabold text-white mt-1">51</div>
           </div>
         </div>
 

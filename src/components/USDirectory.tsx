@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowUpRight, Building2, CheckCircle2, Database, MapPin, Search } from 'lucide-react'
 import jurisdictionData from '../data/us_jurisdictions.json'
+import { stateSaleGuides } from '../data/stateSaleGuides'
 import type { Property } from '../types/property'
 
 interface CountyRecord {
@@ -46,6 +47,11 @@ function countySearchUrl(county: CountyRecord, state: StateRecord) {
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`
 }
 
+function stateRulesSearchUrl(state: StateRecord) {
+  const query = `site:.gov ${state.name} official delinquent property tax sale rules`
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`
+}
+
 function cleanCountyName(name: string) {
   return name.replace(/ County$| Parish$| Borough$| Census Area$| Municipality$| city and borough$/i, '')
 }
@@ -79,6 +85,7 @@ export default function USDirectory({ properties, onOpenListings }: Props) {
   }, [normalizedQuery])
 
   const visibleCounties = selected?.counties ?? []
+  const liveStates = new Set(properties.map((property) => property.state)).size
 
   const countyRow = (state: StateRecord, county: CountyRecord) => {
     const normalizedCounty = cleanCountyName(county.name)
@@ -127,9 +134,9 @@ export default function USDirectory({ properties, onOpenListings }: Props) {
             <Building2 className="h-5 w-5" />
             <span className="text-[10px] font-bold uppercase tracking-[0.18em]">National research directory</span>
           </div>
-          <h2 id="us-directory-title" className="mt-2 text-2xl font-extrabold text-white">Every U.S. state and county equivalent</h2>
+          <h2 id="us-directory-title" className="mt-2 text-2xl font-extrabold text-white">Nationwide tax-sale research</h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">
-            Browse all 50 states, the District of Columbia, and 3,144 current county equivalents. Green rows have live records in this dashboard; all other rows take you to official-source research without copying restricted auction catalogs.
+            All 50 states, the District of Columbia, and 3,144 county equivalents are included. Every county has an official-source search; green rows are the {liveStates} state{liveStates === 1 ? '' : 's'} with live records currently loaded.
           </p>
         </div>
         <a href={data.source.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-xs font-bold text-zinc-500 hover:text-zinc-300">
@@ -158,9 +165,16 @@ export default function USDirectory({ properties, onOpenListings }: Props) {
       ) : selected ? (
         <div>
           <button type="button" onClick={() => setSelectedState('')} className="mb-4 inline-flex items-center gap-2 text-sm font-bold text-zinc-500 hover:text-white"><ArrowLeft className="h-4 w-4" />All states</button>
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div><h3 className="text-xl font-extrabold text-white">{selected.name}</h3><p className="mt-1 text-sm text-zinc-500">{visibleCounties.length.toLocaleString()} county equivalents</p></div>
-            <div className="text-right text-xs text-zinc-600">State FIPS {selected.fips}</div>
+          <div className="mb-5 flex flex-col justify-between gap-4 border-b border-zinc-800 pb-5 sm:flex-row sm:items-end">
+            <div>
+              <h3 className="text-xl font-extrabold text-white">{selected.name}</h3>
+              <p className="mt-1 text-sm font-semibold text-emerald-400">{stateSaleGuides[selected.abbreviation].salePaths}</p>
+              <p className="mt-1 text-xs text-zinc-500">{visibleCounties.length.toLocaleString()} county equivalents. This is a research starting point; verify the current sale instrument and rules with the selling authority.</p>
+            </div>
+            <a href={stateRulesSearchUrl(selected)} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 flex-none items-center gap-2 rounded-md border border-zinc-700 bg-zinc-950 px-3 text-xs font-bold text-zinc-300 hover:border-zinc-600 hover:text-white">
+              Find state rules
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
           </div>
           <div className="grid gap-2">{visibleCounties.map((county) => countyRow(selected, county))}</div>
         </div>
@@ -170,7 +184,11 @@ export default function USDirectory({ properties, onOpenListings }: Props) {
             const stateListings = properties.filter((property) => property.state === state.abbreviation).length
             return (
               <button key={state.fips} type="button" onClick={() => setSelectedState(state.abbreviation)} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/45 p-4 text-left hover:border-emerald-500/35 hover:bg-zinc-900">
-                <div className="min-w-0"><div className="font-bold text-zinc-100">{state.name}</div><div className="mt-1 text-xs text-zinc-500">{state.counties.length} county equivalents</div></div>
+                <div className="min-w-0">
+                  <div className="font-bold text-zinc-100">{state.name}</div>
+                  <div className="mt-1 text-xs leading-relaxed text-zinc-500">{stateSaleGuides[state.abbreviation].salePaths}</div>
+                  <div className="mt-2 text-[10px] font-bold uppercase text-zinc-600">{state.counties.length} county equivalents</div>
+                </div>
                 <div className="text-right"><div className="text-xs font-extrabold text-emerald-400">{state.abbreviation}</div>{stateListings > 0 && <div className="mt-1 text-[10px] font-bold text-zinc-500">{stateListings.toLocaleString()} live</div>}</div>
               </button>
             )
