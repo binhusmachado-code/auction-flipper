@@ -1,6 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
-const expectedTokenHash = 'cbd74246419459c30ba4bc413a878f1a8a40d2dba31983a067275cd84b5d5004'
+const expectedTokenHash = '1db6083d01ed590b90dd37f67076dcebf4d1cd0454ebc15c85bc975b89f276ff'
 const allowedSourceHosts = new Set([
   'broward.realtaxdeed.com',
   'county-taxes.net',
