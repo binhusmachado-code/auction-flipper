@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
-import time
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -14,6 +15,8 @@ import requests
 
 from brevard_tax_deed import fetch_upcoming as fetch_brevard
 from broward_tax_deed import fetch_upcoming as fetch_broward
+from clerk_grid_tax_deed import CLERK_GRID_FEEDS, fetch_upcoming as fetch_clerk_grid
+from collier_tax_deed import fetch_upcoming as fetch_collier
 from gulf_tax_deed import fetch_upcoming as fetch_gulf
 from suwannee_tax_deed import fetch_upcoming as fetch_suwannee
 
@@ -23,7 +26,17 @@ FEEDS: list[tuple[str, str, str, Callable[[], list[dict]]]] = [
     ("brevard-tax-deed-", "Brevard", "https://www.brevardclerk.us/tax-deed-sales", fetch_brevard),
     ("suwannee-tax-deed-", "Suwannee", "https://www.suwgov.org/tax-deed-sales/", fetch_suwannee),
     ("gulf-tax-deed-", "Gulf", "https://www.gulfclerk.com/courts/tax-deeds/", fetch_gulf),
+    ("collier-tax-deed-", "Collier", "https://notices.collierclerk.com/genre/tax-deeds/", fetch_collier),
 ]
+FEEDS.extend(
+    (
+        f"{config.slug}-tax-deed-",
+        config.county,
+        config.base_url,
+        lambda config=config: fetch_clerk_grid(config),
+    )
+    for config in CLERK_GRID_FEEDS
+)
 
 
 def _read_existing(path: Path) -> list[dict]:
@@ -34,10 +47,7 @@ def _read_existing(path: Path) -> list[dict]:
 
 
 def _geocode(properties: list[dict], existing: dict[str, dict]) -> None:
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": "AuctionFlipper/1.0 (public county auction index; github.com/binhusmachado-code/auction-flipper)"
-    })
+    pending: list[dict] = []
     for listing in properties:
         old = existing.get(listing["id"], {})
         if not listing.get("latitude") and old.get("latitude"):
@@ -45,25 +55,37 @@ def _geocode(properties: list[dict], existing: dict[str, dict]) -> None:
             listing["longitude"] = old["longitude"]
         if listing.get("latitude") or listing.get("address", "").startswith("Parcel "):
             continue
-        query = ", ".join(
-            part for part in (
-                listing.get("address", ""), listing.get("city", ""), listing.get("state", ""), listing.get("zip", "")
-            ) if part
-        )
+        pending.append(listing)
+
+    for start in range(0, len(pending), 500):
+        batch = pending[start:start + 500]
+        upload = io.StringIO()
+        writer = csv.writer(upload)
+        for listing in batch:
+            writer.writerow([
+                listing["id"], listing.get("address", ""), listing.get("city", ""),
+                listing.get("state", ""), listing.get("zip", ""),
+            ])
         try:
-            response = session.get(
-                "https://nominatim.openstreetmap.org/search",
-                params={"q": query, "format": "jsonv2", "limit": 1, "countrycodes": "us"},
-                timeout=30,
+            response = requests.post(
+                "https://geocoding.geo.census.gov/geocoder/geographies/addressbatch",
+                files={"addressFile": ("addresses.csv", upload.getvalue(), "text/csv")},
+                data={"benchmark": "Public_AR_Current", "vintage": "Current_Current"},
+                headers={"User-Agent": "AuctionFlipper/1.0 public county auction index"},
+                timeout=90,
             )
             response.raise_for_status()
-            matches = response.json()
-            if matches:
-                listing["latitude"] = round(float(matches[0]["lat"]), 7)
-                listing["longitude"] = round(float(matches[0]["lon"]), 7)
-        except (requests.RequestException, ValueError, KeyError):
-            pass
-        time.sleep(1.05)
+            by_id = {listing["id"]: listing for listing in batch}
+            for row in csv.reader(io.StringIO(response.text)):
+                if len(row) < 6 or row[2].strip().lower() != "match":
+                    continue
+                longitude, latitude = row[5].split(",")
+                listing = by_id.get(row[0])
+                if listing:
+                    listing["latitude"] = round(float(latitude), 7)
+                    listing["longitude"] = round(float(longitude), 7)
+        except (requests.RequestException, ValueError, IndexError):
+            print("Census batch geocoding failed; address links remain available.")
 
 
 def refresh(output: Path, metadata_output: Path) -> list[dict]:

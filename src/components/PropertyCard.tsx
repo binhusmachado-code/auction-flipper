@@ -116,7 +116,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
                 {property.saleType === 'Tax Lien' ? 'Tax Owed' : 'Opening Bid'}
               </div>
               <div className="text-lg font-bold text-emerald-400">
-                {formatCurrency(property.price)}
+                {property.price > 0 ? formatCurrency(property.price) : 'Not posted'}
               </div>
             </div>
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
@@ -125,7 +125,11 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
                 {property.saleType === 'Tax Lien' ? 'Interest Rate' : 'Est. Min. Deposit'}
               </div>
               <div className="text-lg font-bold text-emerald-400">
-                {property.saleType === 'Tax Lien' ? `${property.interestRate}%` : formatCurrency(property.depositRequired ?? 0)}
+                {property.saleType === 'Tax Lien'
+                  ? `${property.interestRate}%`
+                  : property.depositRequired !== undefined
+                    ? formatCurrency(property.depositRequired)
+                    : 'Verify rules'}
               </div>
             </div>
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
@@ -143,7 +147,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
                 Assessed Value
               </div>
               <div className="text-lg font-bold text-zinc-200">
-                {formatCurrency(property.assessedValue)}
+                {property.assessedValue > 0 ? formatCurrency(property.assessedValue) : 'Not verified'}
               </div>
             </div>
           </div>

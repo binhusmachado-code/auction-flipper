@@ -1,6 +1,6 @@
 {
-  "refreshedAt": "2026-08-21",
-  "total": 172,
+  "refreshedAt": "2026-08-22",
+  "total": 843,
   "sources": [
     {
       "county": "Broward",
@@ -24,6 +24,36 @@
       "county": "Gulf",
       "url": "https://www.gulfclerk.com/courts/tax-deeds/",
       "count": 1,
+      "status": "verified"
+    },
+    {
+      "county": "Collier",
+      "url": "https://notices.collierclerk.com/genre/tax-deeds/",
+      "count": 23,
+      "status": "verified"
+    },
+    {
+      "county": "Palm Beach",
+      "url": "https://taxdeed.mypalmbeachclerk.com/",
+      "count": 117,
+      "status": "verified"
+    },
+    {
+      "county": "Duval",
+      "url": "https://taxdeed.duvalclerk.com/",
+      "count": 489,
+      "status": "verified"
+    },
+    {
+      "county": "Bay",
+      "url": "https://records2.baycoclerk.com/TaxDeed/",
+      "count": 11,
+      "status": "verified"
+    },
+    {
+      "county": "Clay",
+      "url": "https://landmark.clayclerk.com/TaxDeed/",
+      "count": 31,
       "status": "verified"
     }
   ]

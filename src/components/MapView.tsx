@@ -109,7 +109,7 @@ export default function MapView({ properties, onSelect, favorites }: Props) {
                     </div>
                   )}
                   <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
-                    <div><span className="text-gray-500">{p.saleType === 'Tax Deed' ? 'Opening bid:' : 'Price:'}</span> <span className="font-semibold">{formatCurrency(p.price)}</span></div>
+                    <div><span className="text-gray-500">{p.saleType === 'Tax Deed' ? 'Opening bid:' : 'Price:'}</span> <span className="font-semibold">{p.price > 0 ? formatCurrency(p.price) : 'Not posted'}</span></div>
                     {needsDueDiligence ? (
                       <>
                         <div><span className="text-gray-500">County:</span> <span className="font-semibold">{p.county}</span></div>

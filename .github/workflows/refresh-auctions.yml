@@ -1,0 +1,71 @@
+name: Refresh official auction inventory
+
+on:
+  schedule:
+    - cron: "15 10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auction-inventory-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scraper/requirements.txt
+      - name: Install scraper dependencies
+        run: pip install -r scraper/requirements.txt
+      - name: Load the protected current snapshot
+        env:
+          AUCTION_REFRESH_TOKEN: ${{ secrets.AUCTION_REFRESH_TOKEN }}
+        run: |
+          curl --fail --silent --show-error \
+            -H "x-refresh-token: ${AUCTION_REFRESH_TOKEN}" \
+            "https://dlnurzizylroqchedfbf.supabase.co/functions/v1/refresh-tax-deeds" \
+            > /tmp/current-inventory.json
+          jq '.records' /tmp/current-inventory.json > src/data/tax_deed_properties.json
+      - name: Test county parsers
+        run: python -m unittest discover -s scraper/tax_deed -p 'test_*_tax_deed.py' -v
+      - name: Refresh official county inventory
+        run: python scraper/tax_deed/refresh_tax_deeds.py
+      - name: Validate inventory before publishing
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import date
+
+          records = json.load(open('src/data/tax_deed_properties.json'))
+          counties = {record['county'] for record in records}
+          assert len(records) >= 100, f'Refresh returned only {len(records)} records'
+          assert len(records) == len({record['id'] for record in records}), 'Duplicate property IDs found'
+          assert len(counties) >= 8, f'Refresh returned only {len(counties)} counties'
+          assert all(record.get('sourceUrl', '').startswith('https://') for record in records)
+          assert all(record.get('auctionDate', '') >= date.today().isoformat() for record in records)
+          print(f'Validated {len(records)} future records across {len(counties)} counties')
+          PY
+      - name: Sync the protected live database
+        env:
+          AUCTION_REFRESH_TOKEN: ${{ secrets.AUCTION_REFRESH_TOKEN }}
+        run: |
+          jq -n \
+            --slurpfile records src/data/tax_deed_properties.json \
+            --slurpfile metadata src/data/tax_deed_metadata.json \
+            '{records: $records[0], metadata: $metadata[0]}' \
+            > /tmp/auction-refresh.json
+          curl --fail --silent --show-error \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-refresh-token: ${AUCTION_REFRESH_TOKEN}" \
+            --data-binary @/tmp/auction-refresh.json \
+            "https://dlnurzizylroqchedfbf.supabase.co/functions/v1/refresh-tax-deeds"
