@@ -3,6 +3,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.ts'
 import { useToast } from '../components/ToastProvider.tsx'
 import type { Property } from '../types/property'
 import taxDeedProperties from '../data/tax_deed_properties.json'
+import { collectPages } from '../lib/pagination.ts'
 
 type PropertyRecord = Record<string, unknown>
 
@@ -115,21 +116,30 @@ export function useSupabaseProperties(hasPrivateAccess = false) {
     }
 
     let cancelled = false
-    supabase
-      .from('properties')
-      .select('*')
-      .order('price', { ascending: true })
-      .then(({ data, error }: any) => {
+    const loadProperties = async () => {
+      const pageSize = 1000
+      return collectPages<PropertyRecord>(async (offset, end) => {
+        const { data, error }: any = await supabase
+          .from('properties')
+          .select('*')
+          .order('price', { ascending: true })
+          .order('id', { ascending: true })
+          .range(offset, end)
+        if (error) throw error
+        return (data ?? []) as PropertyRecord[]
+      }, pageSize)
+    }
+
+    loadProperties()
+      .then((rows) => {
         if (cancelled) return
-        if (error) {
-          console.warn('Live property data unavailable; using official county listings.', error)
-          setProperties(officialTaxDeedProperties)
-        } else if (data?.length) {
-          const mapped: Property[] = data.map(normalizeProperty)
-          setProperties(mapped)
-        } else {
-          setProperties(officialTaxDeedProperties)
-        }
+        setProperties(rows.length ? rows.map(normalizeProperty) : officialTaxDeedProperties)
+        setLoading(false)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        console.warn('Live property data unavailable; using official county listings.', error)
+        setProperties(officialTaxDeedProperties)
         setLoading(false)
       })
     return () => { cancelled = true }
