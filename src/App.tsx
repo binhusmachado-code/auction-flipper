@@ -351,8 +351,8 @@ export default function App() {
             <div className="text-2xl font-extrabold text-white mt-1">{formatCurrency(totalTaxOwed)}</div>
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">States</div>
-            <div className="text-2xl font-extrabold text-white mt-1">{statesCount}</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">{view === 'directory' ? 'States + DC' : 'Listing States'}</div>
+            <div className="text-2xl font-extrabold text-white mt-1">{view === 'directory' ? 51 : statesCount}</div>
           </div>
         </div>
 
