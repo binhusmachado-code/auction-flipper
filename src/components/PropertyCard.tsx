@@ -12,6 +12,7 @@ interface Props {
   isFavorite: boolean
   savedAnalysis?: StoredDealAnalysis
   rank?: number
+  screeningRank?: number
 }
 
 function formatCurrency(n: number) {
@@ -28,7 +29,7 @@ function getSaleTypeColor(saleType: string) {
   return 'bg-sky-500/10 text-sky-400 ring-sky-500/20'
 }
 
-export default function PropertyCard({ property, onSelect, onToggleFavorite, isFavorite, savedAnalysis, rank }: Props) {
+export default function PropertyCard({ property, onSelect, onToggleFavorite, isFavorite, savedAnalysis, rank, screeningRank }: Props) {
   const [isVisible, setIsVisible] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -62,6 +63,7 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-zinc-800/60">
           <div className="flex min-w-0 items-center gap-2">
             {rank && <span className="inline-flex items-center gap-1 rounded-md bg-amber-400 px-2 py-1 text-[10px] font-black text-zinc-950"><Trophy className="h-3 w-3" />#{rank}</span>}
+            {!rank && screeningRank && <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-black text-amber-400"><Trophy className="h-3 w-3" />Screen #{screeningRank}</span>}
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider rounded-full ring-1 ${getSaleTypeColor(displaySaleType)}`}>
               <Tag className="w-3 h-3" />
               {displaySaleType}

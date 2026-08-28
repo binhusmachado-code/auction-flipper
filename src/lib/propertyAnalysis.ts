@@ -21,6 +21,18 @@ export interface RankedDealAnalysis extends StoredDealAnalysis {
   verdict: DealVerdict
 }
 
+export interface VerifiedOpportunity {
+  propertyId: string
+  openingBid: number
+  countyValue: number
+  screeningSpread: number
+  screeningDiscount: number
+  valueToBidRatio: number
+  evidenceCount: number
+  evidenceTotal: number
+  cautions: string[]
+}
+
 export const DEAL_ANALYSIS_STORAGE_PREFIX = 'verified-deal-analysis-v1-'
 
 export function dealAnalysisStorageKey(propertyId: string): string {
@@ -98,6 +110,58 @@ export function rankDealAnalyses(records: StoredDealAnalysis[]): RankedDealAnaly
       (b.analysis.marginOfSafety ?? -Infinity) - (a.analysis.marginOfSafety ?? -Infinity) ||
       (b.analysis.projectedProfit ?? -Infinity) - (a.analysis.projectedProfit ?? -Infinity)
     ))
+}
+
+export function rankVerifiedOpportunities(properties: Property[]): VerifiedOpportunity[] {
+  return properties
+    .filter((property) => property.saleType === 'Tax Deed' && property.status === 'Active')
+    .map((property) => {
+      const openingBid = (property.openingBid ?? 0) > 0 ? property.openingBid ?? 0 : property.price
+      const countyValue = property.assessedValue
+      const screeningSpread = countyValue - openingBid
+      const evidence = [
+        property.sourceUrl.startsWith('https://'),
+        Boolean(property.parcelId),
+        Boolean(property.address) && !property.address.toLowerCase().startsWith('parcel '),
+        Boolean(property.latitude && property.longitude),
+        Boolean(property.auctionDate),
+        property.propertyType !== 'Unknown',
+        Boolean(property.description),
+      ]
+      const cautions = [
+        'The county assessed value is for screening and is not a resale price or appraisal.',
+        'Title, surviving liens, occupancy, condition, repairs, and final fees are not verified yet.',
+      ]
+      if (property.propertyType === 'Condo' || property.propertyType === 'Townhouse') {
+        cautions.push('Confirm association approval, assessments, liens, and use or rental restrictions.')
+      } else if (property.propertyType === 'Land') {
+        cautions.push('Confirm legal access, zoning, utilities, flood limits, wetlands, and buildability.')
+      } else if (property.propertyType === 'Multi-Family') {
+        cautions.push('Confirm the legal unit count, occupancy, code issues, and condition of every unit.')
+      } else if (property.propertyType === 'Unknown') {
+        cautions.push('The property type and current use are not confirmed.')
+      }
+
+      return {
+        propertyId: property.id,
+        openingBid,
+        countyValue,
+        screeningSpread,
+        screeningDiscount: countyValue > 0 ? screeningSpread / countyValue * 100 : 0,
+        valueToBidRatio: openingBid > 0 ? countyValue / openingBid : 0,
+        evidenceCount: evidence.filter(Boolean).length,
+        evidenceTotal: evidence.length,
+        cautions,
+        verified: property.valuationVerified === true,
+      }
+    })
+    .filter((item) => item.verified && item.openingBid > 0 && item.countyValue > 0 && item.screeningSpread > 0)
+    .sort((a, b) => (
+      b.evidenceCount - a.evidenceCount ||
+      b.valueToBidRatio - a.valueToBidRatio ||
+      b.screeningSpread - a.screeningSpread
+    ))
+    .map(({ verified: _verified, ...item }) => item)
 }
 
 export function getPropertyProsAndCons(property: Property): { pros: string[]; cons: string[] } {

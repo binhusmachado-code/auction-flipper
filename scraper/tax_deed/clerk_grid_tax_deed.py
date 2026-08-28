@@ -257,12 +257,14 @@ def fetch_upcoming(
             parcel_id=parcel_id,
             owner_name=owner_name,
         )
+        assessed_value = float(detail.get("assessed_value") or 0)
         listing.update({
             "zip": zip_code,
             "propertyType": property_type(f"{assessed_as} {legal}"),
             "sqft": int(detail.get("sqft") or 0),
             "lotSize": float(detail.get("lot_size") or 0),
-            "assessedValue": float(detail.get("assessed_value") or 0),
+            "assessedValue": assessed_value,
+            "valuationVerified": config.slug == "palm-beach" and assessed_value > 0,
         })
         properties.append(listing)
     return sorted(properties, key=lambda item: (item["auctionDate"], item["id"]))

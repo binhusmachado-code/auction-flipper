@@ -19,12 +19,15 @@ import {
   getDueDiligenceItems,
   getPropertyProsAndCons,
   type StoredDealAnalysis,
+  type VerifiedOpportunity,
 } from '../lib/propertyAnalysis'
 
 interface Props {
   property: Property
   savedAnalysis?: StoredDealAnalysis
   rank?: number
+  screening?: VerifiedOpportunity
+  screeningRank?: number
   onClose: () => void
   onOpenCalculator: () => void
 }
@@ -36,7 +39,7 @@ function money(value: number | null | undefined) {
   }).format(value)
 }
 
-export default function PropertyAnalysisModal({ property, savedAnalysis, rank, onClose, onOpenCalculator }: Props) {
+export default function PropertyAnalysisModal({ property, savedAnalysis, rank, screening, screeningRank, onClose, onOpenCalculator }: Props) {
   const analysis = savedAnalysis ? analyzeTaxDeedScenario(savedAnalysis.scenario) : null
   const verdict = analysis && savedAnalysis
     ? getDealVerdict(analysis, savedAnalysis.scenario)
@@ -63,6 +66,7 @@ export default function PropertyAnalysisModal({ property, savedAnalysis, rank, o
             <div className="flex flex-wrap items-center gap-2">
               <h2 id="property-analysis-title" className="text-lg font-black text-white">Full Property Analysis</h2>
               {rank && <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-black text-emerald-400">Rank #{rank}</span>}
+              {!rank && screeningRank && <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-black text-amber-400">Screen #{screeningRank}</span>}
             </div>
             <p className="mt-1 truncate text-sm text-zinc-500">{property.address}, {property.city}, {property.state}</p>
           </div>
@@ -86,6 +90,27 @@ export default function PropertyAnalysisModal({ property, savedAnalysis, rank, o
             <div className="border-b border-zinc-800 pb-3"><div className="text-[11px] font-bold uppercase text-zinc-500">Maximum bid</div><div className="mt-1 text-xl font-black text-emerald-400">{property.saleType === 'Tax Lien' ? 'Not a deed bid' : money(analysis?.maximumBid)}</div></div>
             <div className="border-b border-zinc-800 pb-3"><div className="text-[11px] font-bold uppercase text-zinc-500">Approx. profit</div><div className="mt-1 text-xl font-black text-emerald-400">{property.saleType === 'Tax Lien' ? 'Rate not verified' : money(analysis?.projectedProfit)}</div></div>
           </section>
+
+          {screening && (
+            <section className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-4" aria-labelledby="screening-reason">
+              <div className="flex gap-3">
+                <ShieldCheck className="mt-0.5 h-5 w-5 flex-none text-amber-400" />
+                <div className="min-w-0 flex-1">
+                  <h3 id="screening-reason" className="font-bold text-amber-400">Why this property is automatically ranked</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-zinc-300">It has an official opening bid, a county-sourced assessed value, and {screening.evidenceCount} of {screening.evidenceTotal} screening facts available. The value difference below is not profit and does not make the property bid-ready.</p>
+                  <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div><dt className="text-[10px] font-bold uppercase text-zinc-600">Opening bid</dt><dd className="mt-1 text-sm font-black text-white">{money(screening.openingBid)}</dd></div>
+                    <div><dt className="text-[10px] font-bold uppercase text-zinc-600">County value</dt><dd className="mt-1 text-sm font-black text-white">{money(screening.countyValue)}</dd></div>
+                    <div><dt className="text-[10px] font-bold uppercase text-zinc-600">Value spread</dt><dd className="mt-1 text-sm font-black text-amber-400">{money(screening.screeningSpread)}</dd></div>
+                    <div><dt className="text-[10px] font-bold uppercase text-zinc-600">Value / bid</dt><dd className="mt-1 text-sm font-black text-zinc-200">{screening.valueToBidRatio.toFixed(1)}x</dd></div>
+                  </dl>
+                  <ul className="mt-4 space-y-2 text-xs leading-relaxed text-zinc-500">
+                    {screening.cautions.map((caution) => <li key={caution} className="flex gap-2"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-none text-amber-400" />{caution}</li>)}
+                  </ul>
+                </div>
+              </div>
+            </section>
+          )}
 
           {analysis?.complete && savedAnalysis && (
             <section className="border-y border-zinc-800 py-5" aria-labelledby="saved-numbers">

@@ -18,6 +18,7 @@ import {
   dealAnalysisStorageKey,
   getDealVerdict,
   rankDealAnalyses,
+  rankVerifiedOpportunities,
   type StoredDealAnalysis,
 } from './lib/propertyAnalysis.ts'
 import taxDeedMetadata from './data/tax_deed_metadata.json'
@@ -121,9 +122,18 @@ export default function App() {
   }, [currentProperties])
 
   const rankedAnalyses = useMemo(() => rankDealAnalyses(Object.values(savedAnalyses)), [savedAnalyses])
+  const screenedOpportunities = useMemo(() => rankVerifiedOpportunities(currentProperties), [currentProperties])
   const rankById = useMemo(
     () => new Map(rankedAnalyses.map((record, index) => [record.propertyId, index + 1])),
     [rankedAnalyses]
+  )
+  const screeningRankById = useMemo(
+    () => new Map(screenedOpportunities.map((record, index) => [record.propertyId, index + 1])),
+    [screenedOpportunities]
+  )
+  const screeningById = useMemo(
+    () => new Map(screenedOpportunities.map((record) => [record.propertyId, record])),
+    [screenedOpportunities]
   )
 
   const saveAnalysis = (record: StoredDealAnalysis) => {
@@ -188,7 +198,11 @@ export default function App() {
         const bValue = b.valuationVerified ? b.assessedValue : -Infinity
         return bValue - aValue
       }
-      if (filter.sortBy === 'rank') return (rankById.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rankById.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+      if (filter.sortBy === 'rank') {
+        const aRank = rankById.get(a.id) ?? ((screeningRankById.get(a.id) ?? Number.MAX_SAFE_INTEGER) + 1_000)
+        const bRank = rankById.get(b.id) ?? ((screeningRankById.get(b.id) ?? Number.MAX_SAFE_INTEGER) + 1_000)
+        return aRank - bRank
+      }
       if (filter.sortBy === 'deal') {
         const aSaved = savedAnalyses[a.id]
         const bSaved = savedAnalyses[b.id]
@@ -200,7 +214,7 @@ export default function App() {
       const bDate = b.auctionDate ? new Date(`${b.auctionDate}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER
       return aDate - bDate || a.price - b.price
     })
-  }, [currentProperties, favorites, view, filter, rankById, savedAnalyses])
+  }, [currentProperties, favorites, view, filter, rankById, savedAnalyses, screeningRankById])
 
   const upcomingAuctions = useMemo(() => {
     const today = new Date()
@@ -462,6 +476,7 @@ export default function App() {
         {view !== 'directory' && (
           <TopDealRanking
             ranked={rankedAnalyses}
+            screened={screenedOpportunities}
             properties={currentProperties}
             onOpen={setSelectedProperty}
           />
@@ -516,6 +531,7 @@ export default function App() {
                   isFavorite={favorites.includes(p.id)}
                   savedAnalysis={savedAnalyses[p.id]}
                   rank={rankById.get(p.id)}
+                  screeningRank={screeningRankById.get(p.id)}
                 />
               ))}
             </div>
@@ -584,6 +600,8 @@ export default function App() {
           property={selectedProperty}
           savedAnalysis={savedAnalyses[selectedProperty.id]}
           rank={rankById.get(selectedProperty.id)}
+          screening={screeningById.get(selectedProperty.id)}
+          screeningRank={screeningRankById.get(selectedProperty.id)}
           onClose={() => setSelectedProperty(null)}
           onOpenCalculator={() => {
             setCalculatorProperty(selectedProperty)

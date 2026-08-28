@@ -116,7 +116,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           <option value="price-low">Price: low to high</option>
           <option value="price-high">Price: high to low</option>
           <option value="assessed-high">Verified assessed value: high</option>
-          <option value="rank">Best analyzed deals</option>
+          <option value="rank">Best verified opportunities</option>
           <option value="deal">Analyzed profit: high</option>
         </select>
       </div>

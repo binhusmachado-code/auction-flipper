@@ -7,6 +7,7 @@ import {
   getDueDiligenceItems,
   getPropertyProsAndCons,
   rankDealAnalyses,
+  rankVerifiedOpportunities,
 } from '../src/lib/propertyAnalysis'
 import type { Property } from '../src/types/property'
 
@@ -99,4 +100,57 @@ test('explains due diligence and property facts without inventing unknowns', () 
   assert.ok(diligence.some((item) => item.title === 'Title and surviving liens'))
   assert.ok(diligence.every((item) => item.explanation.length > 20))
   assert.ok(tips[0].includes('$68,571'))
+})
+
+test('automatically ranks only priced deeds with a verified county value', () => {
+  const base = {
+    id: 'mapped-house',
+    address: '127 WOODLAND DR',
+    city: 'WEST MELBOURNE',
+    state: 'FL',
+    county: 'Brevard',
+    price: 7_200.17,
+    openingBid: 7_200.17,
+    assessedValue: 192_170,
+    estimatedValue: 999_999,
+    valuationVerified: true,
+    saleType: 'Tax Deed',
+    status: 'Active',
+    sourceUrl: 'https://www.brevardclerk.us/tax-deed-sales',
+    parcelId: '2820975',
+    auctionDate: '2026-10-22',
+    propertyType: 'Single Family',
+    latitude: 28.08,
+    longitude: -80.65,
+    description: 'Official county tax deed record.',
+  } as Property
+  const unverified = { ...base, id: 'unverified', valuationVerified: false, assessedValue: 500_000 }
+  const unpriced = { ...base, id: 'unpriced', price: 0, openingBid: 0 }
+
+  const ranked = rankVerifiedOpportunities([unverified, unpriced, base])
+
+  assert.deepEqual(ranked.map((item) => item.propertyId), ['mapped-house'])
+  assert.equal(ranked[0].openingBid, 7_200.17)
+  assert.equal(ranked[0].countyValue, 192_170)
+  assert.equal(ranked[0].screeningSpread, 184_969.83)
+  assert.ok(ranked[0].cautions.some((item) => item.includes('not a resale price')))
+})
+
+test('prioritizes verifiable property evidence before a larger raw value ratio', () => {
+  const complete = {
+    id: 'complete', address: '127 WOODLAND DR', city: 'WEST MELBOURNE', state: 'FL', county: 'Brevard',
+    price: 10_000, openingBid: 10_000, assessedValue: 200_000, estimatedValue: 0,
+    valuationVerified: true, saleType: 'Tax Deed', status: 'Active', sourceUrl: 'https://county.gov/deed',
+    parcelId: '123', auctionDate: '2026-10-22', propertyType: 'Single Family', latitude: 28, longitude: -80,
+    description: 'Single family residence.',
+  } as Property
+  const incomplete = {
+    ...complete, id: 'incomplete', address: 'Parcel 456', parcelId: '456', latitude: 0, longitude: 0,
+    propertyType: 'Unknown', price: 1_000, openingBid: 1_000,
+  } as Property
+
+  const ranked = rankVerifiedOpportunities([incomplete, complete])
+
+  assert.deepEqual(ranked.map((item) => item.propertyId), ['complete', 'incomplete'])
+  assert.ok(ranked[0].evidenceCount > ranked[1].evidenceCount)
 })

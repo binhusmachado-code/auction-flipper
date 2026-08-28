@@ -143,12 +143,14 @@ def fetch_upcoming(today: date | None = None) -> list[dict]:
             owner_name=str(attributes.get("OWNER_NAME1") or "").strip(),
         )
         latitude, longitude = centroid(feature.get("geometry"))
+        assessed_value = round(float(attributes.get("BLDG_VALUE") or 0) + float(attributes.get("LAND_VALUE") or 0), 2)
         listing.update({
             "zip": str(attributes.get("ZIP_CODE") or "").strip(),
             "propertyType": property_type(use_description),
             "sqft": int(attributes.get("LIV_AREA") or 0),
             "lotSize": round(float(attributes.get("ACRES") or 0), 2),
-            "assessedValue": round(float(attributes.get("BLDG_VALUE") or 0) + float(attributes.get("LAND_VALUE") or 0), 2),
+            "assessedValue": assessed_value,
+            "valuationVerified": assessed_value > 0,
             "latitude": latitude,
             "longitude": longitude,
         })
