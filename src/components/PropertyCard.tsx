@@ -123,12 +123,16 @@ export default function PropertyCard({ property, onSelect, onToggleFavorite, isF
             <div className="bg-zinc-950/50 rounded-xl p-3 border border-zinc-800/40">
               <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 uppercase tracking-wider mb-1">
                 <Percent className="w-3 h-3" />
-                {property.saleType === 'Tax Lien' ? 'Interest Rate' : 'Est. Min. Deposit'}
+                {property.saleType === 'Tax Lien'
+                  ? 'Interest Rate'
+                  : property.depositRequired === 0 ? 'Payment Rule' : 'Est. Min. Deposit'}
               </div>
               <div className="text-lg font-bold text-emerald-400">
                 {property.saleType === 'Tax Lien'
                   ? property.interestRate > 0 ? `${property.interestRate}%` : 'Verify rate'
-                  : property.depositRequired !== undefined
+                  : property.depositRequired === 0
+                    ? 'Full payment'
+                    : property.depositRequired !== undefined
                     ? formatCurrency(property.depositRequired)
                     : 'Verify rules'}
               </div>

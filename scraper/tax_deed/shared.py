@@ -61,6 +61,7 @@ def base_property(
     parcel_id: str,
     owner_name: str = "",
     deposit_required: float | None = None,
+    state: str = "FL",
 ) -> dict[str, Any]:
     """Build a conservative listing without inventing market or building data."""
     opening_bid = money(price)
@@ -68,7 +69,7 @@ def base_property(
         "id": property_id,
         "address": address or f"Parcel {parcel_id}",
         "city": city or f"{county} County",
-        "state": "FL",
+        "state": state,
         "zip": "",
         "price": opening_bid,
         "estimatedValue": 0,

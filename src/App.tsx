@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
-import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, ShieldCheck, Building2, LogOut } from 'lucide-react'
+import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, ShieldCheck, Building2, LogOut, ChevronDown } from 'lucide-react'
 import { Property, DealFilter } from './types/property'
 import { useSupabaseAuth, useSupabaseProperties, useSupabaseFavorites } from './hooks/useSupabase.ts'
 import { useAccountProfile } from './hooks/useAccount.ts'
@@ -25,6 +25,7 @@ import taxDeedMetadata from './data/tax_deed_metadata.json'
 import './index.css'
 
 const USDirectory = lazy(() => import('./components/USDirectory.tsx'))
+const RESULT_PAGE_SIZE = 60
 
 function formatCurrency(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
@@ -48,6 +49,7 @@ export default function App() {
   const [showAccountDashboard, setShowAccountDashboard] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(RESULT_PAGE_SIZE)
   const [view, setView] = useState<'all' | 'favorites' | 'map' | 'directory'>('all')
   const [filter, setFilter] = useState<DealFilter>({
     state: '',
@@ -215,6 +217,11 @@ export default function App() {
       return aDate - bDate || a.price - b.price
     })
   }, [currentProperties, favorites, view, filter, rankById, savedAnalyses, screeningRankById])
+  const visibleProperties = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
+
+  useEffect(() => {
+    setVisibleCount(RESULT_PAGE_SIZE)
+  }, [filter, view])
 
   const upcomingAuctions = useMemo(() => {
     const today = new Date()
@@ -521,20 +528,34 @@ export default function App() {
               <p className="text-zinc-500 mt-2">Try adjusting your filters.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {filtered.map((p) => (
-                <PropertyCard
-                  key={p.id}
-                  property={p}
-                  onSelect={setSelectedProperty}
-                  onToggleFavorite={toggleFavorite}
-                  isFavorite={favorites.includes(p.id)}
-                  savedAnalysis={savedAnalyses[p.id]}
-                  rank={rankById.get(p.id)}
-                  screeningRank={screeningRankById.get(p.id)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {visibleProperties.map((p) => (
+                  <PropertyCard
+                    key={p.id}
+                    property={p}
+                    onSelect={setSelectedProperty}
+                    onToggleFavorite={toggleFavorite}
+                    isFavorite={favorites.includes(p.id)}
+                    savedAnalysis={savedAnalyses[p.id]}
+                    rank={rankById.get(p.id)}
+                    screeningRank={screeningRankById.get(p.id)}
+                  />
+                ))}
+              </div>
+              {visibleProperties.length < filtered.length && (
+                <div className="mt-8 flex flex-col items-center gap-3 border-t border-zinc-800 pt-6">
+                  <p className="text-xs font-semibold text-zinc-500">Showing {visibleProperties.length.toLocaleString()} of {filtered.length.toLocaleString()} matching properties</p>
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((count) => count + RESULT_PAGE_SIZE)}
+                    className="inline-flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm font-bold text-zinc-200 hover:border-emerald-500/50 hover:text-emerald-400"
+                  >
+                    <ChevronDown className="h-4 w-4" />Show more properties
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -547,12 +568,14 @@ export default function App() {
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-zinc-100 text-lg">Data Sources</h3>
               <p className="text-sm text-zinc-500 mt-1 max-w-2xl">
-                Live listings come from ten official county inventories. The U.S. directory includes every state and county equivalent,
+                Live listings come from twelve official state and county inventories across Florida, Arkansas, New Mexico, and Colorado. The U.S. directory includes every state and county equivalent,
                 with direct official links where verified and source-research links everywhere else. Always recheck status,
                 title, liens, condition, and bid amount on the government or authorized auction site.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
                 {[
+                  { name: 'Arkansas State Tax-Deed Auctions', url: 'https://cosl.org/Home/Contents', desc: 'Official statewide COSL catalogs, minimum bids, and daily removals' },
+                  { name: 'New Mexico Property-Tax Auctions', url: 'https://www.tax.newmexico.gov/businesses/property-tax-overview/delinquent-property-tax-auctions/', desc: 'Official statewide auction notices, cases, legal descriptions, and minimum bids' },
                   { name: 'Bay Tax Deeds', url: 'https://records2.baycoclerk.com/TaxDeed/', desc: 'Official Clerk case search and future sale calendar' },
                   { name: 'Brevard Tax Deeds', url: 'https://www.brevardclerk.us/tax-deed-sales', desc: 'Official sale schedules and bidder information' },
                   { name: 'Broward Tax Deeds', url: 'https://county-taxes.net/broward/reports/real-estate', desc: 'Official Tax Collector future auction reports and certified property lists' },

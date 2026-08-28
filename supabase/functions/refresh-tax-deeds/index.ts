@@ -12,6 +12,8 @@ const allowedSourceHosts = new Set([
   'taxdeed.duvalclerk.com',
   'records2.baycoclerk.com',
   'landmark.clayclerk.com',
+  'cosl.org',
+  'www.tax.newmexico.gov',
 ])
 
 type CatalogRecord = Record<string, unknown>
@@ -192,15 +194,22 @@ Deno.serve(async (request) => {
       }
     }
 
-    const verified = new Set(
+    const verifiedStates = new Set(
       (metadata.sources ?? [])
-        .filter((source) => source.status === 'verified')
-        .map((source) => String(source.county)),
+        .filter((source) => source.status === 'verified' && source.scope === 'state')
+        .map((source) => String(source.state)),
+    )
+    const verifiedCounties = new Set(
+      (metadata.sources ?? [])
+        .filter((source) => source.status === 'verified' && source.scope !== 'state')
+        .map((source) => `${String(source.state)}|${String(source.county)}`),
     )
     const verifiedAt = new Date().toISOString()
     const normalized = records.map((record) => normalize(
       record,
-      verified.has(String(record.county)) ? verifiedAt : null,
+      verifiedStates.has(String(record.state)) || verifiedCounties.has(`${String(record.state)}|${String(record.county)}`)
+        ? verifiedAt
+        : null,
     ))
 
     const { supabaseUrl, serviceRoleKey } = await databaseSettings()

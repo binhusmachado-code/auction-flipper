@@ -13,25 +13,32 @@ from typing import Callable
 
 import requests
 
+from arkansas_tax_deed import CONTENTS_URL as ARKANSAS_CONTENTS_URL
+from arkansas_tax_deed import fetch_upcoming as fetch_arkansas
 from brevard_tax_deed import fetch_upcoming as fetch_brevard
 from broward_tax_deed import fetch_upcoming as fetch_broward
 from clerk_grid_tax_deed import CLERK_GRID_FEEDS, fetch_upcoming as fetch_clerk_grid
 from collier_tax_deed import fetch_upcoming as fetch_collier
 from gulf_tax_deed import fetch_upcoming as fetch_gulf
+from new_mexico_tax_deed import AUCTIONS_URL as NEW_MEXICO_AUCTIONS_URL
+from new_mexico_tax_deed import fetch_upcoming as fetch_new_mexico
 from suwannee_tax_deed import fetch_upcoming as fetch_suwannee
 
 
-FEEDS: list[tuple[str, str, str, Callable[[], list[dict]]]] = [
-    ("broward-tax-deed-", "Broward", "https://county-taxes.net/broward/reports/real-estate", fetch_broward),
-    ("brevard-tax-deed-", "Brevard", "https://www.brevardclerk.us/tax-deed-sales", fetch_brevard),
-    ("suwannee-tax-deed-", "Suwannee", "https://www.suwgov.org/tax-deed-sales/", fetch_suwannee),
-    ("gulf-tax-deed-", "Gulf", "https://www.gulfclerk.com/courts/tax-deeds/", fetch_gulf),
-    ("collier-tax-deed-", "Collier", "https://notices.collierclerk.com/genre/tax-deeds/", fetch_collier),
+FEEDS: list[tuple[str, str, str, str, Callable[[], list[dict]]]] = [
+    ("arkansas-tax-deed-", "Arkansas statewide", "AR", ARKANSAS_CONTENTS_URL, fetch_arkansas),
+    ("new-mexico-tax-deed-", "New Mexico statewide", "NM", NEW_MEXICO_AUCTIONS_URL, fetch_new_mexico),
+    ("broward-tax-deed-", "Broward", "FL", "https://county-taxes.net/broward/reports/real-estate", fetch_broward),
+    ("brevard-tax-deed-", "Brevard", "FL", "https://www.brevardclerk.us/tax-deed-sales", fetch_brevard),
+    ("suwannee-tax-deed-", "Suwannee", "FL", "https://www.suwgov.org/tax-deed-sales/", fetch_suwannee),
+    ("gulf-tax-deed-", "Gulf", "FL", "https://www.gulfclerk.com/courts/tax-deeds/", fetch_gulf),
+    ("collier-tax-deed-", "Collier", "FL", "https://notices.collierclerk.com/genre/tax-deeds/", fetch_collier),
 ]
 FEEDS.extend(
     (
         f"{config.slug}-tax-deed-",
         config.county,
+        "FL",
         config.base_url,
         lambda config=config: fetch_clerk_grid(config),
     )
@@ -95,7 +102,7 @@ def refresh(output: Path, metadata_output: Path) -> list[dict]:
     properties: list[dict] = []
     source_metadata: list[dict] = []
 
-    for prefix, county, url, fetcher in FEEDS:
+    for prefix, county, state, url, fetcher in FEEDS:
         try:
             records = fetcher()
             status = "verified"
@@ -110,7 +117,14 @@ def refresh(output: Path, metadata_output: Path) -> list[dict]:
                 record["sourceUrl"] = url
             status = "cached"
         properties.extend(records)
-        source_metadata.append({"county": county, "url": url, "count": len(records), "status": status})
+        source_metadata.append({
+            "county": county,
+            "state": state,
+            "scope": "state" if county.endswith(" statewide") else "county",
+            "url": url,
+            "count": len(records),
+            "status": status,
+        })
 
     _geocode(properties, existing)
     properties.sort(key=lambda item: (item.get("auctionDate", "9999-12-31"), item.get("county", ""), item.get("id", "")))
