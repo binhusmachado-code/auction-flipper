@@ -113,9 +113,10 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           className="px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
         >
           <option value="auction-soonest">Auction: soonest</option>
-          <option value="price-low">Price: low to high</option>
-          <option value="price-high">Price: high to low</option>
+          <option value="price-low">Listed amount: low to high</option>
+          <option value="price-high">Listed amount: high to low</option>
           <option value="assessed-high">Verified assessed value: high</option>
+          <option value="screening-spread">Verified screening spread</option>
           <option value="rank">Best verified opportunities</option>
           <option value="deal">Analyzed profit: high</option>
         </select>
@@ -192,7 +193,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Minimum Price</label>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Minimum Listed Amount</label>
             <input
               type="number"
               min={0}
@@ -205,7 +206,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Maximum Price</label>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">My Maximum Bid Budget</label>
             <input
               type="number"
               min={0}

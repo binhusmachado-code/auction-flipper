@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   CircleX,
   Lightbulb,
-  ListChecks,
   ShieldCheck,
   ThumbsDown,
   ThumbsUp,
@@ -16,11 +15,11 @@ import { analyzeTaxDeedScenario } from '../lib/calculator'
 import {
   getBidTips,
   getDealVerdict,
-  getDueDiligenceItems,
   getPropertyProsAndCons,
   type StoredDealAnalysis,
   type VerifiedOpportunity,
 } from '../lib/propertyAnalysis'
+import PropertyResearchWorkspace from './PropertyResearchWorkspace'
 
 interface Props {
   property: Property
@@ -45,7 +44,6 @@ export default function PropertyAnalysisModal({ property, savedAnalysis, rank, s
     ? getDealVerdict(analysis, savedAnalysis.scenario)
     : { grade: 'Not ready' as const, summary: 'Finish the evidence checks before trusting a grade.', roi: null }
   const { pros, cons } = getPropertyProsAndCons(property)
-  const diligence = getDueDiligenceItems(property)
   const tips = getBidTips(property, analysis?.maximumBid ?? null)
   const totalFees = analysis
     ? analysis.auctionFees + analysis.closingCosts + analysis.titleAndLienCosts + analysis.buyerPremium
@@ -133,18 +131,7 @@ export default function PropertyAnalysisModal({ property, savedAnalysis, rank, s
             <div className="flex gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-amber-400" /><div><h3 id="diligence-meaning" className="font-bold text-amber-400">What “Needs due diligence” means</h3><p className="mt-1 text-sm leading-relaxed text-zinc-300">It means important facts are still missing. It does not mean the property is bad. It means you should not trust a profit, grade, or maximum bid until you check the items below.</p></div></div>
           </section>
 
-          <section aria-labelledby="check-before-bid">
-            <div className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-amber-400" /><h3 id="check-before-bid" className="text-lg font-black text-white">Check before you bid</h3></div>
-            <div className="mt-4 divide-y divide-zinc-800 border-y border-zinc-800">
-              {diligence.map((item, index) => (
-                <div key={item.title} className="grid gap-2 py-4 sm:grid-cols-[32px_200px_1fr] sm:items-start">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-zinc-800 text-xs font-black text-zinc-300">{index + 1}</span>
-                  <h4 className="text-sm font-bold text-zinc-200">{item.title}</h4>
-                  <p className="text-xs leading-relaxed text-zinc-500">{item.explanation}</p>
-                </div>
-              ))}
-            </div>
-          </section>
+          <PropertyResearchWorkspace property={property} />
 
           <section className="grid gap-6 lg:grid-cols-2" aria-label="Property pros and cons">
             <div>

@@ -65,5 +65,5 @@ export interface DealFilter {
   verifiedValueOnly: boolean;
   mappedOnly: boolean;
   auctionDateKnownOnly: boolean;
-  sortBy: 'auction-soonest' | 'price-low' | 'price-high' | 'assessed-high' | 'deal' | 'rank';
+  sortBy: 'auction-soonest' | 'price-low' | 'price-high' | 'assessed-high' | 'screening-spread' | 'deal' | 'rank';
 }

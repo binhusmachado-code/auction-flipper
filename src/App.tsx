@@ -14,6 +14,7 @@ import PropertyAnalysisModal from './components/PropertyAnalysisModal.tsx'
 import TopDealRanking from './components/TopDealRanking.tsx'
 import AccountDashboard from './components/AccountDashboard.tsx'
 import { analyzeTaxDeedScenario } from './lib/calculator.ts'
+import { getListedBidAmount, getVerifiedScreeningSpread } from './lib/propertyBudget.ts'
 import {
   dealAnalysisStorageKey,
   getDealVerdict,
@@ -172,8 +173,9 @@ export default function App() {
       if (filter.propertyType && p.propertyType !== filter.propertyType) return false
       if (filter.saleType && p.saleType !== filter.saleType) return false
       if (filter.auctionType && p.auctionType !== filter.auctionType) return false
-      if (p.price < filter.minPrice) return false
-      if (p.price > filter.maxPrice) return false
+      const listedBidAmount = getListedBidAmount(p)
+      if (listedBidAmount < filter.minPrice) return false
+      if (listedBidAmount > filter.maxPrice) return false
       if (p.interestRate < filter.minInterestRate) return false
       if (filter.maxRedemptionPeriod < 60 && (p.redemptionPeriod <= 0 || p.redemptionPeriod > filter.maxRedemptionPeriod)) return false
       if (filter.keyword) {
@@ -190,15 +192,25 @@ export default function App() {
       return true
     }).sort((a, b) => {
       if (filter.sortBy === 'price-low' || filter.sortBy === 'price-high') {
-        const aHasPrice = a.price > 0
-        const bHasPrice = b.price > 0
+        const aAmount = getListedBidAmount(a)
+        const bAmount = getListedBidAmount(b)
+        const aHasPrice = aAmount > 0
+        const bHasPrice = bAmount > 0
         if (aHasPrice !== bHasPrice) return aHasPrice ? -1 : 1
-        return filter.sortBy === 'price-low' ? a.price - b.price : b.price - a.price
+        return filter.sortBy === 'price-low' ? aAmount - bAmount : bAmount - aAmount
       }
       if (filter.sortBy === 'assessed-high') {
         const aValue = a.valuationVerified ? a.assessedValue : -Infinity
         const bValue = b.valuationVerified ? b.assessedValue : -Infinity
         return bValue - aValue
+      }
+      if (filter.sortBy === 'screening-spread') {
+        const aSpread = getVerifiedScreeningSpread(a)
+        const bSpread = getVerifiedScreeningSpread(b)
+        if (aSpread === null && bSpread === null) return 0
+        if (aSpread === null) return 1
+        if (bSpread === null) return -1
+        return bSpread - aSpread
       }
       if (filter.sortBy === 'rank') {
         const aRank = rankById.get(a.id) ?? ((screeningRankById.get(a.id) ?? Number.MAX_SAFE_INTEGER) + 1_000)
@@ -214,7 +226,7 @@ export default function App() {
       }
       const aDate = a.auctionDate ? new Date(`${a.auctionDate}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER
       const bDate = b.auctionDate ? new Date(`${b.auctionDate}T12:00:00`).getTime() : Number.MAX_SAFE_INTEGER
-      return aDate - bDate || a.price - b.price
+      return aDate - bDate || getListedBidAmount(a) - getListedBidAmount(b)
     })
   }, [currentProperties, favorites, view, filter, rankById, savedAnalyses, screeningRankById])
   const visibleProperties = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount])
@@ -248,7 +260,7 @@ export default function App() {
   }, [currentProperties])
 
   // Stats
-  const totalTaxOwed = filtered.reduce((s, p) => s + p.price, 0)
+  const totalTaxOwed = filtered.reduce((sum, property) => sum + getListedBidAmount(property), 0)
   const lienProperties = filtered.filter(p => p.saleType === 'Tax Lien')
   const knownLienRates = lienProperties.filter(property => property.interestRate > 0)
   const avgInterestRate = knownLienRates.length > 0

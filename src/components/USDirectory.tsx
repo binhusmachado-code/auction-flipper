@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Building2, CheckCircle2, Database, MapPin, Search } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Building2, CheckCircle2, Database, Landmark, MapPin, Search } from 'lucide-react'
 import jurisdictionData from '../data/us_jurisdictions.json'
 import { stateSaleGuides } from '../data/stateSaleGuides'
 import type { Property } from '../types/property'
@@ -41,6 +41,24 @@ const officialAuctionSources: Record<string, string> = {
   'FL|Palm Beach County': 'https://taxdeed.mypalmbeachclerk.com/',
   'FL|Suwannee County': 'https://www.suwgov.org/tax-deed-sales/',
 }
+
+const federalAuctionSources = [
+  {
+    name: 'U.S. Treasury Auctions',
+    url: 'https://home.treasury.gov/services/treasury-auctions/',
+    description: 'Official starting point for IRS and Treasury forfeited-property auctions.',
+  },
+  {
+    name: 'IRS Auctions',
+    url: 'https://www.irsauctions.gov/',
+    description: 'Official notices for property seized for unpaid federal taxes. Read each notice and payment terms.',
+  },
+  {
+    name: 'USAGov Real Estate Sales',
+    url: 'https://www.usa.gov/real-estate-sales',
+    description: 'Official directory for Treasury, GSA, HUD, USDA, FDIC, U.S. Marshals, and federal land sources.',
+  },
+]
 
 function countySearchUrl(county: CountyRecord, state: StateRecord) {
   const query = `${county.name} ${state.name} official tax sale tax deed tax lien auction`
@@ -145,6 +163,24 @@ export default function USDirectory({ properties, onOpenListings }: Props) {
           <ArrowUpRight className="h-3.5 w-3.5" />
         </a>
       </div>
+
+      <section className="border-b border-zinc-800 py-6" aria-labelledby="federal-auctions-title">
+        <div className="flex items-start gap-3">
+          <Landmark className="mt-0.5 h-5 w-5 flex-none text-sky-400" />
+          <div>
+            <h3 id="federal-auctions-title" className="font-black text-white">Federal and seized-property sources</h3>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-zinc-500">These are separate from county tax deed and tax lien sales. Verify the specific notice, inspection rules, deposit, encumbrances, payment deadline, and deed before bidding.</p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {federalAuctionSources.map((source) => (
+            <a key={source.name} href={source.url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-zinc-800 bg-zinc-900/45 p-4 hover:border-sky-500/35 hover:bg-zinc-900">
+              <div className="flex items-center justify-between gap-2 text-sm font-bold text-zinc-100"><span>{source.name}</span><ArrowUpRight className="h-3.5 w-3.5 flex-none text-zinc-600" /></div>
+              <p className="mt-2 text-xs leading-relaxed text-zinc-500">{source.description}</p>
+            </a>
+          ))}
+        </div>
+      </section>
 
       <div className="my-6 grid gap-3 sm:grid-cols-[minmax(0,1fr)_240px]">
         <label className="relative">
