@@ -120,6 +120,7 @@ export function useSupabaseProperties(hasPrivateAccess = false) {
     }
 
     let cancelled = false
+    setLoading(true)
     const loadProperties = async () => {
       const pageSize = 1000
       const fetchPage = async (offset: number, end: number) => {
