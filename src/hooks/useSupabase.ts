@@ -3,7 +3,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.ts'
 import { useToast } from '../components/ToastProvider.tsx'
 import type { Property } from '../types/property'
 import taxDeedProperties from '../data/tax_deed_properties.json'
-import { collectPages } from '../lib/pagination.ts'
+import { collectKnownPages } from '../lib/pagination.ts'
 
 type PropertyRecord = Record<string, unknown>
 
@@ -122,7 +122,7 @@ export function useSupabaseProperties(hasPrivateAccess = false) {
     let cancelled = false
     const loadProperties = async () => {
       const pageSize = 1000
-      return collectPages<PropertyRecord>(async (offset, end) => {
+      const fetchPage = async (offset: number, end: number) => {
         const { data, error }: any = await supabase
           .from('properties')
           .select('*')
@@ -131,7 +131,23 @@ export function useSupabaseProperties(hasPrivateAccess = false) {
           .range(offset, end)
         if (error) throw error
         return (data ?? []) as PropertyRecord[]
-      }, pageSize)
+      }
+
+      const { data, error, count }: any = await supabase
+        .from('properties')
+        .select('*', { count: 'exact' })
+        .order('price', { ascending: true })
+        .order('id', { ascending: true })
+        .range(0, pageSize - 1)
+      if (error) throw error
+
+      const firstPage = (data ?? []) as PropertyRecord[]
+      return collectKnownPages(
+        fetchPage,
+        firstPage,
+        typeof count === 'number' ? count : firstPage.length,
+        pageSize,
+      )
     }
 
     loadProperties()

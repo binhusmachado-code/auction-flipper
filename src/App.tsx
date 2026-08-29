@@ -383,20 +383,25 @@ export default function App() {
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold ring-1 ${s.color}`}
               >
                 {s.name}
-                <span className="px-1.5 py-0.5 bg-white/10 rounded-full text-[10px]">{s.count.toLocaleString()}</span>
+                <span className="px-1.5 py-0.5 bg-white/10 rounded-full text-[10px]">
+                  {propertiesLoading && s.name !== 'States + DC' ? '...' : s.count.toLocaleString()}
+                </span>
               </div>
             ))}
           </div>
 
           <div className="mt-8 flex items-center justify-center gap-3">
             <button
+              type="button"
+              disabled={propertiesLoading}
+              aria-busy={propertiesLoading}
               onClick={() => {
                 const el = document.getElementById('deals')
                 el?.scrollIntoView({ behavior: 'smooth' })
               }}
-              className="pill-btn"
+              className="pill-btn disabled:cursor-wait disabled:opacity-70"
             >
-              Browse {filtered.length.toLocaleString()} Deals
+              {propertiesLoading ? 'Loading Deals...' : `Browse ${filtered.length.toLocaleString()} Deals`}
               <span className="w-7 h-7 rounded-full bg-zinc-950/20 flex items-center justify-center">
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </span>
@@ -421,15 +426,15 @@ export default function App() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
             <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Active Listings</div>
-            <div className="text-2xl font-extrabold text-white mt-1">{filtered.length.toLocaleString()}</div>
+            <div className="text-2xl font-extrabold text-white mt-1">{propertiesLoading ? '...' : filtered.length.toLocaleString()}</div>
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
             <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Avg Interest</div>
-            <div className="text-2xl font-extrabold text-emerald-400 mt-1">{avgInterestRate ? `${avgInterestRate}%` : 'Verify'}</div>
+            <div className="text-2xl font-extrabold text-emerald-400 mt-1">{propertiesLoading ? '...' : avgInterestRate ? `${avgInterestRate}%` : 'Verify'}</div>
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
             <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Total Listed Amount</div>
-            <div className="text-2xl font-extrabold text-white mt-1">{formatCurrency(totalTaxOwed)}</div>
+            <div className="text-2xl font-extrabold text-white mt-1">{propertiesLoading ? '...' : formatCurrency(totalTaxOwed)}</div>
           </div>
           <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
             <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">States + DC</div>
@@ -437,7 +442,7 @@ export default function App() {
           </div>
         </div>
 
-        {view !== 'directory' && upcomingAuctions.length > 0 && (
+        {!propertiesLoading && view !== 'directory' && upcomingAuctions.length > 0 && (
           <section className="mb-8 scroll-mt-28" aria-labelledby="upcoming-auctions-title">
             <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
               <div>
@@ -480,7 +485,7 @@ export default function App() {
           </section>
         )}
 
-        {view !== 'directory' && (
+        {!propertiesLoading && view !== 'directory' && (
           <TopDealRanking
             ranked={rankedAnalyses}
             screened={screenedOpportunities}
@@ -489,7 +494,7 @@ export default function App() {
           />
         )}
 
-        {view !== 'directory' && <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />}
+        {!propertiesLoading && view !== 'directory' && <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />}
 
         {propertiesLoading && (
           <div className="flex items-center justify-center py-20">
