@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
-import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, ShieldCheck, Building2, LogOut, ChevronDown, Table2, LayoutGrid, Bell, Target, UserRound } from 'lucide-react'
+import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, ShieldCheck, Building2, LogOut, ChevronDown, Table2, LayoutGrid, Bell, Target, UserRound, Download } from 'lucide-react'
 import { Property, DealFilter } from './types/property'
 import { useSupabaseAuth, useSupabaseProperties, useSupabaseFavorites, usePublicPropertyPreviews } from './hooks/useSupabase.ts'
 import { useAccountProfile } from './hooks/useAccount.ts'
@@ -24,6 +24,7 @@ import DealCalculator from './components/DealCalculator.tsx'
 import PropertyAnalysisModal from './components/PropertyAnalysisModal.tsx'
 import TopDealRanking from './components/TopDealRanking.tsx'
 import AccountDashboard from './components/AccountDashboard.tsx'
+import CommandCenterLayout from './components/CommandCenterLayout.tsx'
 import { analyzeTaxDeedScenario } from './lib/calculator.ts'
 import { getListedBidAmount, getVerifiedScreeningSpread } from './lib/propertyBudget.ts'
 import {
@@ -73,7 +74,7 @@ export default function App() {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [visibleCount, setVisibleCount] = useState(RESULT_PAGE_SIZE)
-  const [view, setView] = useState<'all' | 'favorites' | 'map' | 'directory' | 'table' | 'calendar' | 'trackers' | 'alerts' | 'learn' | 'pricing'>('all')
+  const [view, setView] = useState<'all' | 'favorites' | 'map' | 'directory' | 'table' | 'calendar' | 'trackers' | 'alerts' | 'learn' | 'pricing'>('table')
   const [filter, setFilter] = useState<DealFilter>({
     state: '',
     county: '',
@@ -369,6 +370,98 @@ export default function App() {
     )
   }
 
+  const overlays = (
+    <>
+      {selectedProperty && (
+        <PropertyAnalysisModal
+          property={selectedProperty}
+          savedAnalysis={savedAnalyses[selectedProperty.id]}
+          rank={rankById.get(selectedProperty.id)}
+          screening={screeningById.get(selectedProperty.id)}
+          screeningRank={screeningRankById.get(selectedProperty.id)}
+          onClose={() => setSelectedProperty(null)}
+          userId={accountUserId}
+          paidAccess={hasPrivateAccess}
+          tracker={trackerByPropertyId.get(selectedProperty.id)}
+          onTrack={async (propertyId, status) => {
+            try { await updateTracker(propertyId, status); showToast('Tracking status updated', 'success') }
+            catch (error) { showToast(error instanceof Error ? error.message : 'Unable to update tracking', 'error'); throw error }
+          }}
+          onOpenCalculator={() => {
+            setCalculatorProperty(selectedProperty)
+            setSelectedProperty(null)
+          }}
+        />
+      )}
+
+      {showAccountDashboard && user && profile && (
+        <AccountDashboard
+          user={user}
+          profile={profile}
+          properties={currentProperties}
+          favoriteIds={favorites}
+          onClose={() => setShowAccountDashboard(false)}
+          onOpenGuide={() => {
+            setShowAccountDashboard(false)
+            openGuide()
+          }}
+          onOpenCalculator={(property) => {
+            setShowAccountDashboard(false)
+            setCalculatorProperty(property)
+          }}
+        />
+      )}
+
+      {showGuide && (
+        <OnboardingWizard
+          onClose={() => setShowGuide(false)}
+          onOpenDirectory={() => {
+            setShowGuide(false)
+            setView('directory')
+          }}
+          onOpenCalculator={() => {
+            const example = currentProperties.find((property) => property.saleType === 'Tax Deed')
+            if (example) setCalculatorProperty(example)
+          }}
+        />
+      )}
+
+      {calculatorProperty?.saleType === 'Tax Deed' && (
+        <DealCalculator property={calculatorProperty} onClose={() => setCalculatorProperty(null)} onSaved={saveAnalysis} />
+      )}
+    </>
+  )
+
+  if (view === 'table') {
+    return (
+      <>
+        <CommandCenterLayout
+          filter={filter}
+          states={states}
+          counties={counties}
+          onFilterChange={setFilter}
+          filteredProperties={filtered}
+          trackers={trackerByPropertyId}
+          savedSearches={savedSearches}
+          entitlements={entitlements}
+          upcomingAuctions={upcomingAuctions}
+          membershipTier={membership.tier}
+          hasOwnerAccess={hasOwnerAccess}
+          favoriteIds={favorites}
+          onOpenProperty={setSelectedProperty}
+          onToggleFavorite={(propertyId) => void toggleFavorite(propertyId)}
+          onViewChange={(nextView) => setView(nextView)}
+          onOpenAccount={() => hasOwnerAccess ? setShowAccountDashboard(true) : setView('pricing')}
+          onSignOut={() => void supabase.auth.signOut()}
+          exportControl={entitlements.csvExport ? <ExportButton properties={filtered} filename="tax-deed-lien-hunter-properties" variant="primary" /> : <button type="button" onClick={() => setView('pricing')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 text-[13px] font-bold text-amber-900 hover:bg-amber-100"><Download className="h-4 w-4" />Upgrade to export</button>}
+        />
+        {overlays}
+      </>
+    )
+  }
+
+  const legacyView = view as 'all' | 'favorites' | 'map' | 'directory' | 'table' | 'calendar' | 'trackers' | 'alerts' | 'learn' | 'pricing'
+
   return (
     <div className="min-h-screen bg-white text-slate-950">
       {/* Floating Nav */}
@@ -564,8 +657,8 @@ export default function App() {
           </div>
         )}
 
-        {!propertiesLoading && ['all', 'favorites', 'map', 'table'].includes(view) && <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />}
-        {!propertiesLoading && ['all', 'favorites', 'map', 'table'].includes(view) && <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm"><button type="button" onClick={() => setView('all')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black ${view === 'all' ? 'bg-emerald-800 text-white' : 'text-slate-600'}`}><LayoutGrid className="h-3.5 w-3.5" />Grid</button><button type="button" onClick={() => setView('table')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black ${view === 'table' ? 'bg-emerald-800 text-white' : 'text-slate-600'}`}><Table2 className="h-3.5 w-3.5" />Table</button><button type="button" onClick={() => setView('map')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black ${view === 'map' ? 'bg-emerald-800 text-white' : 'text-slate-600'}`}><MapIcon className="h-3.5 w-3.5" />Map</button></div><div className="flex items-center gap-2">{entitlements.csvExport ? <ExportButton properties={filtered} filename="tax-lien-hunter-properties" /> : <button type="button" onClick={() => setView('pricing')} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-900">CSV export is in Investor →</button>}<button type="button" onClick={() => setView('alerts')} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700"><Bell className="h-4 w-4" />Save search</button></div></div>}
+        {!propertiesLoading && ['all', 'favorites', 'map', 'table'].includes(legacyView) && <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />}
+        {!propertiesLoading && ['all', 'favorites', 'map', 'table'].includes(legacyView) && <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm"><button type="button" onClick={() => setView('all')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black ${legacyView === 'all' ? 'bg-emerald-800 text-white' : 'text-slate-600'}`}><LayoutGrid className="h-3.5 w-3.5" />Grid</button><button type="button" onClick={() => setView('table')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black ${legacyView === 'table' ? 'bg-emerald-800 text-white' : 'text-slate-600'}`}><Table2 className="h-3.5 w-3.5" />Table</button><button type="button" onClick={() => setView('map')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black ${legacyView === 'map' ? 'bg-emerald-800 text-white' : 'text-slate-600'}`}><MapIcon className="h-3.5 w-3.5" />Map</button></div><div className="flex items-center gap-2">{entitlements.csvExport ? <ExportButton properties={filtered} filename="tax-lien-hunter-properties" /> : <button type="button" onClick={() => setView('pricing')} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-900">CSV export is in Investor →</button>}<button type="button" onClick={() => setView('alerts')} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700"><Bell className="h-4 w-4" />Save search</button></div></div>}
         {!propertiesLoading && ['all', 'favorites', 'map', 'table'].includes(view) && <div className="mb-7 grid gap-3 lg:grid-cols-3"><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Upcoming deadlines</div><CalendarDays className="h-4 w-4 text-emerald-800" /></div><div className="mt-3 space-y-2">{upcomingAuctions.slice(0, 2).map((auction) => <button type="button" key={`${auction.county}-${auction.date}`} onClick={() => setView('calendar')} className="flex w-full items-center justify-between gap-2 text-left text-xs"><span className="truncate font-bold text-slate-700">{auction.county} County</span><span className="font-black text-emerald-800">{formatAuctionDate(auction.date)}</span></button>)}{upcomingAuctions.length === 0 && <p className="text-xs text-slate-500">No dated auctions in this view.</p>}</div></div><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Saved searches</div><Bell className="h-4 w-4 text-emerald-800" /></div><div className="mt-3 flex items-end justify-between"><div className="text-2xl font-black">{savedSearches.length}<span className="ml-1 text-sm font-bold text-slate-400">/ {entitlements.savedSearchLimit}</span></div><button type="button" onClick={() => setView('alerts')} className="text-xs font-black text-emerald-800">Manage →</button></div></div><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Alert delivery</div><Bell className="h-4 w-4 text-emerald-800" /></div><div className="mt-3 text-sm font-black capitalize">{entitlements.alertFrequency === 'none' ? 'Upgrade to unlock alerts' : `${entitlements.alertFrequency} delivery enabled`}</div><p className="mt-1 text-xs text-slate-500">Official-source refresh timing can vary.</p></div></div>}
 
         {propertiesLoading && (
@@ -606,7 +699,7 @@ export default function App() {
             <LearningCenter progress={lessonProgress} onSaveProgress={async (lessonId, completed, quizScore, notes) => { try { await saveLessonProgress(lessonId, completed, quizScore, notes); showToast('Learning progress saved', 'success') } catch (error) { showToast(error instanceof Error ? error.message : 'Unable to save progress', 'error') } }} />
           ) : view === 'pricing' ? (
             <PricingSection currentTier={membership.tier} onChoose={choosePlan} onManageBilling={membership.paidActive ? manageBilling : undefined} />
-          ) : view === 'table' ? (
+          ) : legacyView === 'table' ? (
             <PropertyTable properties={filtered} trackers={trackerByPropertyId} onOpen={setSelectedProperty} />
           ) : !propertiesLoading && filtered.length === 0 ? (
             <div className="py-24 text-center">
@@ -713,64 +806,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Modals */}
-      {selectedProperty && (
-        <PropertyAnalysisModal
-          property={selectedProperty}
-          savedAnalysis={savedAnalyses[selectedProperty.id]}
-          rank={rankById.get(selectedProperty.id)}
-          screening={screeningById.get(selectedProperty.id)}
-          screeningRank={screeningRankById.get(selectedProperty.id)}
-          onClose={() => setSelectedProperty(null)}
-          userId={accountUserId}
-          paidAccess={hasPrivateAccess}
-          tracker={trackerByPropertyId.get(selectedProperty.id)}
-          onTrack={async (propertyId, status) => {
-            try { await updateTracker(propertyId, status); showToast('Tracking status updated', 'success') }
-            catch (error) { showToast(error instanceof Error ? error.message : 'Unable to update tracking', 'error'); throw error }
-          }}
-          onOpenCalculator={() => {
-            setCalculatorProperty(selectedProperty)
-            setSelectedProperty(null)
-          }}
-        />
-      )}
-
-      {showAccountDashboard && user && profile && (
-        <AccountDashboard
-          user={user}
-          profile={profile}
-          properties={currentProperties}
-          favoriteIds={favorites}
-          onClose={() => setShowAccountDashboard(false)}
-          onOpenGuide={() => {
-            setShowAccountDashboard(false)
-            openGuide()
-          }}
-          onOpenCalculator={(property) => {
-            setShowAccountDashboard(false)
-            setCalculatorProperty(property)
-          }}
-        />
-      )}
-
-      {showGuide && (
-        <OnboardingWizard
-          onClose={() => setShowGuide(false)}
-          onOpenDirectory={() => {
-            setShowGuide(false)
-            setView('directory')
-          }}
-          onOpenCalculator={() => {
-            const example = currentProperties.find((property) => property.saleType === 'Tax Deed')
-            if (example) setCalculatorProperty(example)
-          }}
-        />
-      )}
-
-      {calculatorProperty?.saleType === 'Tax Deed' && (
-        <DealCalculator property={calculatorProperty} onClose={() => setCalculatorProperty(null)} onSaved={saveAnalysis} />
-      )}
+      {overlays}
     </div>
   )
 }

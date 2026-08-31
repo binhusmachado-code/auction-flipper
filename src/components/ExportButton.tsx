@@ -4,6 +4,7 @@ import { Property } from '../types/property'
 interface Props {
   properties: Property[]
   filename?: string
+  variant?: 'default' | 'primary'
 }
 
 function escapeCSV(str: string) {
@@ -13,7 +14,7 @@ function escapeCSV(str: string) {
   return str
 }
 
-export default function ExportButton({ properties, filename = 'auction-deals' }: Props) {
+export default function ExportButton({ properties, filename = 'auction-deals', variant = 'default' }: Props) {
   const downloadCSV = () => {
     const headers = [
       'Address', 'City', 'State', 'ZIP', 'Price', 'Est. Value', 'ARV',
@@ -44,7 +45,9 @@ export default function ExportButton({ properties, filename = 'auction-deals' }:
   return (
     <button
       onClick={downloadCSV}
-      className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+      className={variant === 'primary'
+        ? 'inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-800 px-4 text-[13px] font-bold text-white transition-colors hover:bg-emerald-700'
+        : 'flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50'}
       title="Export filtered properties to CSV"
     >
       <Download className="w-4 h-4" />

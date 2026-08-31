@@ -4,6 +4,7 @@ import type { Property } from '../types/property'
 
 interface Props {
   property: Property
+  variant?: 'card' | 'detail'
 }
 
 function mapUrls(property: Property) {
@@ -31,7 +32,7 @@ function mapUrls(property: Property) {
   }
 }
 
-export default function PropertyMedia({ property }: Props) {
+export default function PropertyMedia({ property, variant = 'card' }: Props) {
   const [imageFailed, setImageFailed] = useState(false)
   const [mapFailed, setMapFailed] = useState(false)
   const maps = useMemo(() => mapUrls(property), [property])
@@ -43,7 +44,7 @@ export default function PropertyMedia({ property }: Props) {
   }, [property.id, property.imageUrl])
 
   return (
-    <div className="relative aspect-[16/10] overflow-hidden border-b border-slate-200 bg-slate-100">
+    <div className={`relative overflow-hidden border-b border-slate-200 bg-slate-100 ${variant === 'detail' ? 'aspect-[3.7/1] min-h-[250px]' : 'aspect-[16/10]'}`}>
       {showPhoto ? (
         <img
           src={property.imageUrl}
