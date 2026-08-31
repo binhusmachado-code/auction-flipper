@@ -3,7 +3,6 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.ts'
 import { useToast } from '../components/ToastProvider.tsx'
 import type { Property } from '../types/property'
 import taxDeedProperties from '../data/tax_deed_properties.json'
-import { collectKnownPages } from '../lib/pagination.ts'
 
 type PropertyRecord = Record<string, unknown>
 
@@ -172,12 +171,15 @@ export function useSupabaseProperties(hasPrivateAccess = false) {
       if (error) throw error
 
       const firstPage = (data ?? []) as PropertyRecord[]
-      return collectKnownPages(
-        fetchPage,
-        firstPage,
-        typeof count === 'number' ? count : firstPage.length,
-        pageSize,
-      )
+      const totalRows = typeof count === 'number' ? count : firstPage.length
+      const rows = [...firstPage]
+      // Large ordered property scans can time out when Supabase receives all
+      // remaining ranges concurrently. Load each page in order so an owner
+      // session gets a complete dataset instead of a partial/empty view.
+      for (let offset = pageSize; offset < totalRows; offset += pageSize) {
+        rows.push(...await fetchPage(offset, Math.min(offset + pageSize - 1, totalRows - 1)))
+      }
+      return rows
     }
 
     loadProperties()
