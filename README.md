@@ -39,7 +39,7 @@ git push origin main  # → auto-deploys to production
 
 ## ⚙️ Supabase Backend
 
-- **Project**: `weguwjxuvibbyqrrvqcw` (us-east-1)
+- **Project**: `dlnurzizylroqchedfbf` (us-east-1)
 - **Tables**: `properties`, `profiles`, `subscriptions`, `user_favorites`, `user_alerts`, `saved_searches`, `property_tracking`, `property_notes`, `property_documents`, `property_source_records`, `learning_progress`, `service_requests`
 - **Auth**: Email/password with auto-profile creation
 - **RLS**: Row-level security per user

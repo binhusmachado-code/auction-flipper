@@ -9,7 +9,7 @@
 
 ## One-time owner activation
 
-1. Deploy migrations `202608210001_paid_membership.sql` through `202608210004_security_hardening.sql`, then `202608300001_product_expansion.sql`, to the production Supabase project in order. The expansion migration adds tiered access, saved searches, tracking, notes/documents, source verification, lesson progress, and secure document storage.
+1. The production Supabase project already has the membership, security, refresh, and product-expansion migrations applied. If you set up another environment, deploy migrations `202608210001_paid_membership.sql` through `202608210004_security_hardening.sql`, then `202608300001_product_expansion.sql`, in order. The expansion migration adds tiered access, saved searches, tracking, notes/documents, source verification, lesson progress, and secure document storage.
 2. Open the website, select **Start free**, create the owner's account, and confirm the email address.
 3. In the Supabase SQL Editor, replace the placeholder email and run:
 
