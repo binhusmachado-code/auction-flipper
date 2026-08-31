@@ -4,4 +4,5 @@ scraper/__pycache__
 scraper/*.json
 scraper/*.csv
 scraper/*.log
-*.png
+# Keep the PWA icons in public/; ignore only local QA screenshots.
+qa-*.png
