@@ -44,7 +44,7 @@ export default function PropertyMedia({ property, variant = 'card' }: Props) {
   }, [property.id, property.imageUrl])
 
   return (
-    <div className={`relative overflow-hidden border-b border-slate-200 bg-slate-100 ${variant === 'detail' ? 'aspect-[3.7/1] min-h-[250px]' : 'aspect-[16/10]'}`}>
+    <div className={`relative overflow-hidden border-b border-slate-200 bg-slate-100 ${variant === 'detail' ? 'aspect-[3.2/1] min-h-[270px]' : 'aspect-[16/10]'}`}>
       {showPhoto ? (
         <img
           src={property.imageUrl}

@@ -9,7 +9,6 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
-  CircleDot,
   CircleAlert,
   CircleX,
   Database,
@@ -121,20 +120,21 @@ export default function PropertyAnalysisModal({ property, savedAnalysis, rank, s
         </header>
 
         <main className="px-4 py-5 sm:px-6 lg:px-8">
-          <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 id="property-analysis-title" className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{property.address}</h2>
-                <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-800">{property.saleType ?? property.auctionType}</span>
-                <span className="rounded-lg bg-amber-200 px-3 py-1.5 text-xs font-extrabold text-amber-950">Auction {dateLabel(property.auctionDate)}</span>
-              </div>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><MapPin className="h-4 w-4 text-emerald-700" />{location}</p>
-            </div>
-            <div className="flex items-center gap-5 text-xs font-bold"><span className="inline-flex items-center gap-1.5 text-emerald-800"><CheckCircle2 className="h-4 w-4" />Official source checked</span>{(rank || screeningRank) && <span className="text-slate-500">Research priority #{rank || screeningRank}</span>}</div>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(360px,0.95fr)]">
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(360px,0.95fr)]">
             <div className="min-w-0">
+              <div className="mb-5 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 id="property-analysis-title" className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{property.address}</h2>
+                    <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-extrabold text-emerald-800">{property.saleType ?? property.auctionType}</span>
+                    <span className="rounded-lg bg-amber-200 px-3 py-1.5 text-xs font-extrabold text-amber-950">Auction {dateLabel(property.auctionDate)}</span>
+                    {onTrack && <select aria-label="Tracking status" value={tracker?.status ?? 'watching'} onChange={(event) => { setResearchError(''); void onTrack(property.id, event.target.value as PropertyTrackingStatus).catch((error) => setResearchError(error instanceof Error ? error.message : 'Unable to update tracking')) }} className="h-8 rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold capitalize text-slate-700"><option value="watching">Watching</option><option value="researching">Researching</option><option value="due_diligence">Due diligence</option><option value="ready">Ready</option><option value="won">Won</option><option value="lost">Lost</option><option value="paid">Paid</option><option value="removed">Removed</option></select>}
+                  </div>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600"><MapPin className="h-4 w-4 text-emerald-700" />{location}</p>
+                  {researchError && <p className="mt-1 text-xs font-bold text-red-600">{researchError}</p>}
+                </div>
+                <div className="flex shrink-0 items-center gap-5 text-xs font-bold"><span className="inline-flex items-center gap-1.5 text-emerald-800"><CheckCircle2 className="h-4 w-4" />Official source checked</span>{(rank || screeningRank) && <span className="text-slate-500">Research priority #{rank || screeningRank}</span>}</div>
+              </div>
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm"><PropertyMedia property={property} variant="detail" /></div>
               {property.images.length > 1 && (
                 <div className="mt-3 grid grid-cols-3 gap-3">
@@ -156,8 +156,6 @@ export default function PropertyAnalysisModal({ property, savedAnalysis, rank, s
                 <a href={property.sourceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-emerald-700 bg-white px-4 text-sm font-extrabold text-emerald-900 hover:bg-emerald-50">Open official auction<ArrowUpRight className="h-4 w-4" /></a>
                 {property.saleType === 'Tax Deed' && <button type="button" onClick={onOpenCalculator} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 text-sm font-extrabold text-white hover:bg-emerald-700"><Calculator className="h-4 w-4" />{analysis?.complete ? 'Update full analysis' : 'Start full analysis'}<ArrowUpRight className="h-4 w-4" /></button>}
               </div>
-              {onTrack && <label className="mt-4 block"><span className="mb-1.5 flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-500"><CircleDot className="h-3.5 w-3.5 text-emerald-700" />Tracking status</span><select value={tracker?.status ?? 'watching'} onChange={(event) => { setResearchError(''); void onTrack(property.id, event.target.value as PropertyTrackingStatus).catch((error) => setResearchError(error instanceof Error ? error.message : 'Unable to update tracking')) }} className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold capitalize text-slate-700"><option value="watching">Watching</option><option value="researching">Researching</option><option value="due_diligence">Due diligence</option><option value="ready">Ready</option><option value="won">Won</option><option value="lost">Lost</option><option value="paid">Paid</option><option value="removed">Removed</option></select></label>}
-              {researchError && <p className="mt-2 text-xs font-bold text-red-600">{researchError}</p>}
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2.5 text-sm font-bold text-amber-900"><AlertTriangle className="h-4 w-4 shrink-0" />Needs due diligence before bidding</div>
             </aside>
           </div>
