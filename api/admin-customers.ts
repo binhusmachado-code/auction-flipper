@@ -42,8 +42,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         ids.length
           ? admin.from('profiles').select('id, email, display_name, role, account_status, manual_access_until, created_at').in('id', ids)
           : Promise.resolve({ data: [], error: null }),
-        ids.length
-          ? admin.from('subscriptions').select('user_id, plan, status, current_period_end, cancel_at_period_end').in('user_id', ids)
+          ids.length
+          ? admin.from('subscriptions').select('user_id, plan, tier, billing_interval, status, current_period_end, cancel_at_period_end').in('user_id', ids)
           : Promise.resolve({ data: [], error: null }),
         admin.from('source_health').select('source_id, county, status, record_count, last_success_at, error_message').order('updated_at', { ascending: false }).limit(20),
         admin.from('admin_audit_log').select('id, actor_user_id, target_user_id, action, details, created_at').order('created_at', { ascending: false }).limit(20),
@@ -82,6 +82,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           accessStatus,
           manualAccessUntil: profile?.manual_access_until ?? null,
           plan: subscription?.plan ?? null,
+          tier: subscription?.tier ?? 'free',
           subscriptionStatus: subscription?.status ?? 'none',
           currentPeriodEnd: subscription?.current_period_end ?? null,
           cancelAtPeriodEnd: subscription?.cancel_at_period_end ?? false,

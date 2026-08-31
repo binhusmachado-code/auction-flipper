@@ -1,13 +1,24 @@
 import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
-import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, ShieldCheck, Building2, LogOut, ChevronDown } from 'lucide-react'
+import { Search, Heart, Map as MapIcon, Menu, X, ArrowUpRight, TrendingUp, DollarSign, BookOpen, CalendarDays, RefreshCw, ShieldCheck, Building2, LogOut, ChevronDown, Table2, LayoutGrid, Bell, Target, UserRound } from 'lucide-react'
 import { Property, DealFilter } from './types/property'
-import { useSupabaseAuth, useSupabaseProperties, useSupabaseFavorites } from './hooks/useSupabase.ts'
+import { useSupabaseAuth, useSupabaseProperties, useSupabaseFavorites, usePublicPropertyPreviews } from './hooks/useSupabase.ts'
 import { useAccountProfile } from './hooks/useAccount.ts'
+import { useLearningProgress, useMembership, usePropertyTracking, useSavedSearches } from './hooks/useMemberProduct.ts'
 import { supabase } from './lib/supabase.ts'
+import { openBillingPortal, startCheckout } from './lib/billing.ts'
 import FilterBar from './components/FilterBar'
 import PropertyCard from './components/PropertyCard'
 import MapView from './components/MapView'
 import AuthModal from './components/AuthModal.tsx'
+import PublicHome from './components/PublicHome.tsx'
+import PricingSection from './components/PricingSection.tsx'
+import PropertyTable from './components/PropertyTable.tsx'
+import AuctionCalendar from './components/AuctionCalendar.tsx'
+import TrackingBoard from './components/TrackingBoard.tsx'
+import SavedSearchesPanel from './components/SavedSearchesPanel.tsx'
+import LearningCenter from './components/LearningCenter.tsx'
+import ExportButton from './components/ExportButton.tsx'
+import { useToast } from './components/ToastProvider.tsx'
 import OnboardingWizard from './components/OnboardingWizard.tsx'
 import DealCalculator from './components/DealCalculator.tsx'
 import PropertyAnalysisModal from './components/PropertyAnalysisModal.tsx'
@@ -23,6 +34,7 @@ import {
   type StoredDealAnalysis,
 } from './lib/propertyAnalysis.ts'
 import taxDeedMetadata from './data/tax_deed_metadata.json'
+import type { BillingInterval, PlanTier } from './types/product.ts'
 import './index.css'
 
 const USDirectory = lazy(() => import('./components/USDirectory.tsx'))
@@ -41,17 +53,27 @@ export default function App() {
   const { user, loading: authLoading } = useSupabaseAuth()
   const { profile, loading: profileLoading } = useAccountProfile(user?.id ?? null, user?.email ?? '')
   const hasOwnerAccess = Boolean(user && profile?.role === 'admin' && profile.accountStatus === 'active')
-  const { properties: supabaseProperties, loading: propertiesLoading } = useSupabaseProperties(hasOwnerAccess)
-  const ownerDataUserId = hasOwnerAccess ? user?.id ?? null : null
-  const { favorites, toggleFavorite: toggleSupabaseFavorite } = useSupabaseFavorites(ownerDataUserId)
+  const { membership, entitlements, loading: membershipLoading } = useMembership(user?.id ?? null, hasOwnerAccess)
+  const hasPrivateAccess = hasOwnerAccess || membership.paidActive
+  const { properties: supabaseProperties, loading: privatePropertiesLoading } = useSupabaseProperties(hasPrivateAccess)
+  const { properties: previewProperties, loading: previewPropertiesLoading } = usePublicPropertyPreviews()
+  const accountUserId = user?.id ?? null
+  const { favorites, toggleFavorite: toggleSupabaseFavorite } = useSupabaseFavorites(accountUserId)
+  const { searches: savedSearches, save: saveSearch, remove: removeSearch } = useSavedSearches(accountUserId, membership.tier)
+  const { trackers, byPropertyId: trackerByPropertyId, update: updateTracker } = usePropertyTracking(accountUserId, membership.tier)
+  const { progress: lessonProgress, save: saveLessonProgress } = useLearningProgress(accountUserId)
+  const { showToast } = useToast()
 
+  const [showAuth, setShowAuth] = useState(false)
+  const [authMode, setAuthMode] = useState<'sign-in' | 'sign-up'>('sign-up')
+  const [pendingPlan, setPendingPlan] = useState<{ tier: Exclude<PlanTier, 'free'>; interval: BillingInterval } | null>(null)
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
   const [calculatorProperty, setCalculatorProperty] = useState<Property | null>(null)
   const [showAccountDashboard, setShowAccountDashboard] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [visibleCount, setVisibleCount] = useState(RESULT_PAGE_SIZE)
-  const [view, setView] = useState<'all' | 'favorites' | 'map' | 'directory'>('all')
+  const [view, setView] = useState<'all' | 'favorites' | 'map' | 'directory' | 'table' | 'calendar' | 'trackers' | 'alerts' | 'learn' | 'pricing'>('all')
   const [filter, setFilter] = useState<DealFilter>({
     state: '',
     county: '',
@@ -79,13 +101,50 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!window.location.hash.includes('account')) return
-    if (hasOwnerAccess) {
-      setShowAccountDashboard(true)
-    }
+    const hash = window.location.hash
+    if (hash.includes('account') && hasOwnerAccess) setShowAccountDashboard(true)
+    if (hash.includes('pricing')) setView('pricing')
   }, [hasOwnerAccess])
 
-  const properties = supabaseProperties
+  useEffect(() => {
+    if (!user || !pendingPlan) return
+    const requested = pendingPlan
+    setPendingPlan(null)
+    startCheckout(requested.tier, requested.interval)
+      .then((url) => { window.location.assign(url) })
+      .catch((error) => showToast(error instanceof Error ? error.message : 'Unable to start checkout', 'error'))
+  }, [pendingPlan, showToast, user])
+
+  const choosePlan = async (tier: PlanTier, interval: BillingInterval) => {
+    if (!user) {
+      if (tier !== 'free') setPendingPlan({ tier, interval })
+      setAuthMode('sign-up')
+      setShowAuth(true)
+      return
+    }
+    if (tier === 'free') {
+      setView('all')
+      return
+    }
+    try {
+      const url = await startCheckout(tier, interval)
+      window.location.assign(url)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to start checkout', 'error')
+    }
+  }
+
+  const manageBilling = async () => {
+    try {
+      const url = await openBillingPortal()
+      window.location.assign(url)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Unable to open billing', 'error')
+    }
+  }
+
+  const properties = hasPrivateAccess ? supabaseProperties : previewProperties
+  const propertiesLoading = hasPrivateAccess ? privatePropertiesLoading : previewPropertiesLoading
   const currentProperties = useMemo(() => {
     const today = new Date()
     const todayKey = [
@@ -144,7 +203,7 @@ export default function App() {
   }
 
   const toggleFavorite = async (id: string) => {
-    if (ownerDataUserId) await toggleSupabaseFavorite(id)
+    if (accountUserId) await toggleSupabaseFavorite(id)
   }
 
   const openGuide = () => {
@@ -269,87 +328,85 @@ export default function App() {
   const lienCount = lienProperties.length
   const deedCount = filtered.filter(p => p.saleType === 'Tax Deed').length
 
-  const navLink = (key: 'all' | 'favorites' | 'map' | 'directory', label: string, icon: React.ReactNode) => (
+  const navLink = (key: 'all' | 'favorites' | 'map' | 'directory' | 'table' | 'calendar' | 'trackers' | 'alerts' | 'learn' | 'pricing', label: string, icon: React.ReactNode) => (
     <button
       key={key}
       onClick={() => { setView(key); setShowGuide(false); setShowMobileMenu(false) }}
       className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
         view === key
-          ? 'bg-emerald-500 text-zinc-950'
-          : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+          ? 'bg-emerald-800 text-white'
+          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
       }`}
     >
       {icon}
       {label}
       {key === 'favorites' && favorites.length > 0 && (
-        <span className="ml-0.5 px-1.5 py-0.5 text-[10px] bg-zinc-950/20 text-zinc-950 rounded-full font-bold">{favorites.length}</span>
+        <span className="ml-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-bold text-current">{favorites.length}</span>
       )}
     </button>
   )
 
-  const guideLink = (
-    <button
-      key="guide"
-      onClick={openGuide}
-      className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all duration-300"
-    >
-      <BookOpen className="w-3.5 h-3.5" />
-      Guide
-    </button>
-  )
-
-  if (authLoading || (user && profileLoading)) {
-    return <div className="grid min-h-screen place-items-center bg-zinc-950"><div className="flex items-center gap-3 text-sm font-semibold text-zinc-500"><div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />Checking owner access...</div></div>
+  if (authLoading || (user && (profileLoading || membershipLoading))) {
+    return <div className="grid min-h-screen place-items-center bg-emerald-50/60"><div className="flex items-center gap-3 text-sm font-semibold text-slate-600"><div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-700" />Preparing your research workspace…</div></div>
   }
 
-  if (!hasOwnerAccess) {
-    if (!user) return <AuthModal />
+  if (!user) {
+    return showAuth
+      ? <AuthModal initialMode={authMode} onBack={() => setShowAuth(false)} />
+      : <PublicHome onSignIn={() => { setAuthMode('sign-in'); setShowAuth(true) }} onStartFree={() => { setAuthMode('sign-up'); setShowAuth(true) }} onChoosePlan={choosePlan} />
+  }
+
+  if (profile?.accountStatus === 'suspended') {
     return (
-      <main className="grid min-h-screen place-items-center bg-zinc-950 px-4">
-        <section className="w-full max-w-md rounded-lg border border-amber-500/25 bg-zinc-900 p-7 text-center">
+      <main className="grid min-h-screen place-items-center bg-emerald-50/60 px-4">
+        <section className="w-full max-w-md rounded-2xl border border-amber-200 bg-white p-7 text-center shadow-xl">
           <ShieldCheck className="mx-auto h-8 w-8 text-amber-400" />
-          <h1 className="mt-4 text-xl font-extrabold text-white">Owner access only</h1>
-          <p className="mt-2 text-sm text-zinc-500">The signed-in account is not the active owner administrator.</p>
-          <button type="button" onClick={() => void supabase.auth.signOut()} className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-4 text-sm font-bold text-zinc-300 hover:bg-zinc-800"><LogOut className="h-4 w-4" />Sign out</button>
+          <h1 className="mt-4 text-xl font-extrabold text-slate-950">Account access paused</h1>
+          <p className="mt-2 text-sm text-slate-600">Please contact support if you think this is a mistake.</p>
+          <button type="button" onClick={() => void supabase.auth.signOut()} className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"><LogOut className="h-4 w-4" />Sign out</button>
         </section>
       </main>
     )
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-white text-slate-950">
       {/* Floating Nav */}
-      <nav className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-5xl">
-        <div className="glass rounded-full px-2 py-2">
+      <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/95 px-4 backdrop-blur-xl">
+        <div className="mx-auto max-w-7xl py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 pl-3">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
-                <TrendingUp className="w-4 h-4 text-zinc-950" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-800 shadow-sm">
+                <TrendingUp className="h-4 w-4 text-white" />
               </div>
-              <span className="font-bold text-zinc-100 text-sm hidden sm:block">Tax Lien Hunter</span>
+              <span className="hidden text-sm font-black tracking-tight text-emerald-950 sm:block">TAX DEED &amp; LIEN HUNTER</span>
             </div>
 
             <div className="hidden md:flex items-center gap-1">
-              {navLink('all', 'All', <Search className="w-3.5 h-3.5" />)}
-              {navLink('map', 'Map', <MapIcon className="w-3.5 h-3.5" />)}
+              {navLink('all', 'Discover', <Search className="w-3.5 h-3.5" />)}
+              {navLink('calendar', 'Calendar', <CalendarDays className="w-3.5 h-3.5" />)}
+              {navLink('trackers', 'Trackers', <Target className="w-3.5 h-3.5" />)}
               {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
+              {navLink('alerts', 'Alerts', <Bell className="w-3.5 h-3.5" />)}
+              {navLink('learn', 'Learn', <BookOpen className="w-3.5 h-3.5" />)}
               {navLink('directory', 'Nationwide', <Building2 className="w-3.5 h-3.5" />)}
-              {guideLink}
             </div>
 
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setShowAccountDashboard(true)}
-                aria-label="Owner dashboard"
+                onClick={() => hasOwnerAccess ? setShowAccountDashboard(true) : setView('pricing')}
+                aria-label="Account and membership"
                 className="pill-btn !px-3 !py-2 text-xs sm:!px-4"
               >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Owner</span>
+                {hasOwnerAccess ? <ShieldCheck className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">{hasOwnerAccess ? 'Owner' : membership.tier === 'free' ? 'Upgrade' : 'Billing'}</span>
               </button>
+              {membership.paidActive && !hasOwnerAccess && <button type="button" onClick={() => void manageBilling()} className="hidden rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50 sm:inline-flex">Manage billing</button>}
+              {!hasOwnerAccess && <button type="button" onClick={() => void supabase.auth.signOut()} aria-label="Sign out" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-950"><LogOut className="h-4 w-4" /></button>}
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 aria-label={showMobileMenu ? 'Close navigation menu' : 'Open navigation menu'}
-                className="md:hidden p-2.5 text-zinc-500 hover:text-zinc-200 transition-colors"
+                className="p-2.5 text-slate-500 transition-colors hover:text-slate-950 md:hidden"
               >
                 {showMobileMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
               </button>
@@ -357,38 +414,44 @@ export default function App() {
           </div>
 
           {showMobileMenu && (
-            <div className="md:hidden mt-2 pt-2 border-t border-zinc-800 flex flex-col gap-1 animate-fade-in">
-              {navLink('all', 'All Deals', <Search className="w-3.5 h-3.5" />)}
-              {navLink('map', 'Map View', <MapIcon className="w-3.5 h-3.5" />)}
+            <div className="mt-2 flex flex-col gap-1 border-t border-slate-200 pt-2 md:hidden animate-fade-in">
+              {navLink('all', 'Discover', <Search className="w-3.5 h-3.5" />)}
+              {navLink('table', 'Table', <Table2 className="w-3.5 h-3.5" />)}
+              {navLink('map', 'Map', <MapIcon className="w-3.5 h-3.5" />)}
+              {navLink('calendar', 'Calendar', <CalendarDays className="w-3.5 h-3.5" />)}
+              {navLink('trackers', 'Trackers', <Target className="w-3.5 h-3.5" />)}
               {navLink('favorites', 'Saved', <Heart className="w-3.5 h-3.5" />)}
+              {navLink('alerts', 'Alerts', <Bell className="w-3.5 h-3.5" />)}
+              {navLink('learn', 'Learn', <BookOpen className="w-3.5 h-3.5" />)}
               {navLink('directory', 'Nationwide', <Building2 className="w-3.5 h-3.5" />)}
-              {guideLink}
             </div>
           )}
         </div>
       </nav>
 
       {/* Hero */}
-      <header className="relative pt-32 pb-16 px-4 overflow-hidden">
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 text-emerald-400 text-[11px] font-bold uppercase tracking-[0.2em] rounded-full mb-6 border border-emerald-500/20">
-            <TrendingUp className="w-3 h-3" />
-            Official County Auction Records
-          </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1] text-balance">
-            Tax Lien &<br className="hidden sm:block" /> Deed Investing
+      <header className="border-b border-slate-200 bg-white px-4 py-7 sm:py-9">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+          <div>
+          <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-800">{hasPrivateAccess ? `${membership.tier} member` : 'Free preview'}</span>{!hasPrivateAccess && <button type="button" onClick={() => setView('pricing')} className="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-900">Unlock full records →</button>}</div>
+          <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+            Property command center
           </h1>
-          <p className="mt-5 text-zinc-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed text-balance">
-            Review tax-sale opportunities, compare the numbers, and open the official auction source before you bid.
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
+            Screen official auction records, keep due diligence visible, and make every bid decision traceable.
           </p>
+          </div>
+          <div className="flex items-center gap-2"><button type="button" onClick={() => setView('alerts')} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-black text-slate-700"><Bell className="h-4 w-4 text-emerald-800" />{savedSearches.length} saved</button><button type="button" onClick={() => setView('table')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-800 px-3 py-2.5 text-xs font-black text-white"><Table2 className="h-4 w-4" />Open table</button></div>
+          </div>
 
           {/* Stats pills */}
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
+          <div className="hidden">
             {[
-              { name: 'Tax Liens', count: lienCount, color: 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' },
-              { name: 'Tax Deeds', count: deedCount, color: 'bg-amber-500/10 text-amber-400 ring-amber-500/20' },
-              { name: 'Active Listings', count: currentProperties.length, color: 'bg-sky-500/10 text-sky-400 ring-sky-500/20' },
-              { name: 'States + DC', count: 51, color: 'bg-zinc-800 text-zinc-300 ring-zinc-700' },
+              { name: 'Tax Liens', count: lienCount, color: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
+              { name: 'Tax Deeds', count: deedCount, color: 'bg-amber-50 text-amber-800 ring-amber-200' },
+              { name: 'Active Listings', count: currentProperties.length, color: 'bg-sky-50 text-sky-800 ring-sky-200' },
+              { name: 'States + DC', count: 51, color: 'bg-white text-slate-700 ring-slate-200' },
             ].map((s) => (
               <div
                 key={s.name}
@@ -402,7 +465,7 @@ export default function App() {
             ))}
           </div>
 
-          <div className="mt-8 flex items-center justify-center gap-3">
+          <div className="hidden">
             <button
               type="button"
               disabled={propertiesLoading}
@@ -423,39 +486,37 @@ export default function App() {
               className="pill-btn-outline"
             >
               <BookOpen className="w-4 h-4" />
-              Buyer Guide
+              How auctions work
             </button>
           </div>
         </div>
 
-        {/* Background glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/5 rounded-full blur-3xl -z-10" />
       </header>
 
       {/* Main Content */}
-      <main id="deals" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 scroll-mt-28">
+      <main id="deals" className="mx-auto max-w-7xl scroll-mt-28 px-4 pb-20 pt-6 sm:px-6 lg:px-8">
         {/* Stats row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-          <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Active Listings</div>
-            <div className="text-2xl font-extrabold text-white mt-1">{propertiesLoading ? '...' : filtered.length.toLocaleString()}</div>
+        <div className="hidden">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">Active Listings</div>
+            <div className="mt-1 text-2xl font-extrabold text-slate-950">{propertiesLoading ? '...' : filtered.length.toLocaleString()}</div>
           </div>
-          <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Avg Interest</div>
-            <div className="text-2xl font-extrabold text-emerald-400 mt-1">{propertiesLoading ? '...' : avgInterestRate ? `${avgInterestRate}%` : 'Verify'}</div>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">Avg Interest</div>
+            <div className="mt-1 text-2xl font-extrabold text-emerald-800">{propertiesLoading ? '...' : avgInterestRate ? `${avgInterestRate}%` : 'Verify'}</div>
           </div>
-          <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">Total Listed Amount</div>
-            <div className="text-2xl font-extrabold text-white mt-1">{propertiesLoading ? '...' : formatCurrency(totalTaxOwed)}</div>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">Total Listed Amount</div>
+            <div className="mt-1 text-2xl font-extrabold text-slate-950">{propertiesLoading ? '...' : formatCurrency(totalTaxOwed)}</div>
           </div>
-          <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-zinc-500">States + DC</div>
-            <div className="text-2xl font-extrabold text-white mt-1">51</div>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 text-center shadow-sm">
+            <div className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">States + DC</div>
+            <div className="mt-1 text-2xl font-extrabold text-slate-950">51</div>
           </div>
         </div>
 
         {!propertiesLoading && view !== 'directory' && upcomingAuctions.length > 0 && (
-          <section className="mb-8 scroll-mt-28" aria-labelledby="upcoming-auctions-title">
+          <section className="hidden" aria-labelledby="upcoming-auctions-title">
             <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
               <div>
                 <div className="flex items-center gap-2">
@@ -498,15 +559,14 @@ export default function App() {
         )}
 
         {!propertiesLoading && view !== 'directory' && (
-          <TopDealRanking
-            ranked={rankedAnalyses}
-            screened={screenedOpportunities}
-            properties={currentProperties}
-            onOpen={setSelectedProperty}
-          />
+          <div className="hidden">
+            <TopDealRanking ranked={rankedAnalyses} screened={screenedOpportunities} properties={currentProperties} onOpen={setSelectedProperty} />
+          </div>
         )}
 
-        {!propertiesLoading && view !== 'directory' && <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />}
+        {!propertiesLoading && ['all', 'favorites', 'map', 'table'].includes(view) && <FilterBar filter={filter} states={states} counties={counties} onChange={setFilter} />}
+        {!propertiesLoading && ['all', 'favorites', 'map', 'table'].includes(view) && <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm"><button type="button" onClick={() => setView('all')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black ${view === 'all' ? 'bg-emerald-800 text-white' : 'text-slate-600'}`}><LayoutGrid className="h-3.5 w-3.5" />Grid</button><button type="button" onClick={() => setView('table')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black ${view === 'table' ? 'bg-emerald-800 text-white' : 'text-slate-600'}`}><Table2 className="h-3.5 w-3.5" />Table</button><button type="button" onClick={() => setView('map')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black ${view === 'map' ? 'bg-emerald-800 text-white' : 'text-slate-600'}`}><MapIcon className="h-3.5 w-3.5" />Map</button></div><div className="flex items-center gap-2">{entitlements.csvExport ? <ExportButton properties={filtered} filename="tax-lien-hunter-properties" /> : <button type="button" onClick={() => setView('pricing')} className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-900">CSV export is in Investor →</button>}<button type="button" onClick={() => setView('alerts')} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700"><Bell className="h-4 w-4" />Save search</button></div></div>}
+        {!propertiesLoading && ['all', 'favorites', 'map', 'table'].includes(view) && <div className="mb-7 grid gap-3 lg:grid-cols-3"><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Upcoming deadlines</div><CalendarDays className="h-4 w-4 text-emerald-800" /></div><div className="mt-3 space-y-2">{upcomingAuctions.slice(0, 2).map((auction) => <button type="button" key={`${auction.county}-${auction.date}`} onClick={() => setView('calendar')} className="flex w-full items-center justify-between gap-2 text-left text-xs"><span className="truncate font-bold text-slate-700">{auction.county} County</span><span className="font-black text-emerald-800">{formatAuctionDate(auction.date)}</span></button>)}{upcomingAuctions.length === 0 && <p className="text-xs text-slate-500">No dated auctions in this view.</p>}</div></div><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Saved searches</div><Bell className="h-4 w-4 text-emerald-800" /></div><div className="mt-3 flex items-end justify-between"><div className="text-2xl font-black">{savedSearches.length}<span className="ml-1 text-sm font-bold text-slate-400">/ {entitlements.savedSearchLimit}</span></div><button type="button" onClick={() => setView('alerts')} className="text-xs font-black text-emerald-800">Manage →</button></div></div><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center justify-between"><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Alert delivery</div><Bell className="h-4 w-4 text-emerald-800" /></div><div className="mt-3 text-sm font-black capitalize">{entitlements.alertFrequency === 'none' ? 'Upgrade to unlock alerts' : `${entitlements.alertFrequency} delivery enabled`}</div><p className="mt-1 text-xs text-slate-500">Official-source refresh timing can vary.</p></div></div>}
 
         {propertiesLoading && (
           <div className="flex items-center justify-center py-20">
@@ -536,16 +596,35 @@ export default function App() {
               onSelect={setSelectedProperty}
               favorites={favorites}
             />
+          ) : view === 'calendar' ? (
+            <AuctionCalendar properties={filtered} onOpen={setSelectedProperty} />
+          ) : view === 'trackers' ? (
+            <TrackingBoard properties={currentProperties} trackers={trackers} onOpen={setSelectedProperty} onUpdate={async (propertyId, status) => { try { await updateTracker(propertyId, status) } catch (error) { showToast(error instanceof Error ? error.message : 'Unable to update tracker', 'error') } }} />
+          ) : view === 'alerts' ? (
+            <SavedSearchesPanel searches={savedSearches} currentFilter={filter} tier={membership.tier} onSave={async (name, filters, frequency) => { try { await saveSearch(name, filters, frequency); showToast('Search saved', 'success') } catch (error) { throw error } }} onApply={(nextFilter) => { setFilter(nextFilter); setView('all') }} onRemove={async (id) => { try { await removeSearch(id); showToast('Saved search removed', 'info') } catch (error) { showToast(error instanceof Error ? error.message : 'Unable to remove search', 'error') } }} />
+          ) : view === 'learn' ? (
+            <LearningCenter progress={lessonProgress} onSaveProgress={async (lessonId, completed, quizScore, notes) => { try { await saveLessonProgress(lessonId, completed, quizScore, notes); showToast('Learning progress saved', 'success') } catch (error) { showToast(error instanceof Error ? error.message : 'Unable to save progress', 'error') } }} />
+          ) : view === 'pricing' ? (
+            <PricingSection currentTier={membership.tier} onChoose={choosePlan} onManageBilling={membership.paidActive ? manageBilling : undefined} />
+          ) : view === 'table' ? (
+            <PropertyTable properties={filtered} trackers={trackerByPropertyId} onOpen={setSelectedProperty} />
           ) : !propertiesLoading && filtered.length === 0 ? (
-            <div className="text-center py-24">
-              <div className="inline-flex p-5 bg-zinc-900 rounded-full mb-5">
-                <Search className="w-8 h-8 text-zinc-600" />
+            <div className="py-24 text-center">
+              <div className="mb-5 inline-flex rounded-full bg-slate-100 p-5">
+                <Search className="h-8 w-8 text-slate-400" />
               </div>
-              <h3 className="text-xl font-bold text-zinc-100">No deals found</h3>
-              <p className="text-zinc-500 mt-2">Try adjusting your filters.</p>
+              <h3 className="text-xl font-bold text-slate-950">No properties found</h3>
+              <p className="mt-2 text-slate-500">Try widening your search or clearing a filter.</p>
             </div>
           ) : (
             <>
+              <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight text-slate-950">Available properties</h2>
+                  <p className="mt-1 text-sm text-slate-500">{filtered.length.toLocaleString()} matching properties · sorted by {filter.sortBy === 'auction-soonest' ? 'auction date' : 'your selection'}</p>
+                </div>
+                <p className="text-xs font-semibold text-slate-500">Showing 1–{visibleProperties.length.toLocaleString()} of {filtered.length.toLocaleString()}</p>
+              </div>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {visibleProperties.map((p) => (
                   <PropertyCard
@@ -561,12 +640,12 @@ export default function App() {
                 ))}
               </div>
               {visibleProperties.length < filtered.length && (
-                <div className="mt-8 flex flex-col items-center gap-3 border-t border-zinc-800 pt-6">
-                  <p className="text-xs font-semibold text-zinc-500">Showing {visibleProperties.length.toLocaleString()} of {filtered.length.toLocaleString()} matching properties</p>
+                <div className="mt-8 flex flex-col items-center gap-3 border-t border-slate-200 pt-6">
+                  <p className="text-xs font-semibold text-slate-500">Showing {visibleProperties.length.toLocaleString()} of {filtered.length.toLocaleString()} matching properties</p>
                   <button
                     type="button"
                     onClick={() => setVisibleCount((count) => count + RESULT_PAGE_SIZE)}
-                    className="inline-flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm font-bold text-zinc-200 hover:border-emerald-500/50 hover:text-emerald-400"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-emerald-800 hover:border-emerald-700"
                   >
                     <ChevronDown className="h-4 w-4" />Show more properties
                   </button>
@@ -577,14 +656,14 @@ export default function App() {
         </div>
 
         {/* Data Sources */}
-        <div className="mt-16 bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-8">
+        <div className="mt-16 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-6 sm:p-8">
           <div className="flex flex-col items-start gap-4 sm:flex-row">
-            <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
-              <DollarSign className="w-5 h-5 text-emerald-400" />
+            <div className="rounded-2xl border border-emerald-200 bg-white p-3">
+              <DollarSign className="h-5 w-5 text-emerald-700" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-bold text-zinc-100 text-lg">Data Sources</h3>
-              <p className="text-sm text-zinc-500 mt-1 max-w-2xl">
+              <h3 className="text-lg font-bold text-slate-950">Official data sources</h3>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
                 Live listings come from twelve official state and county inventories across Florida, Arkansas, New Mexico, and Colorado. The U.S. directory includes every state and county equivalent,
                 with direct official links where verified and source-research links everywhere else. Always recheck status,
                 title, liens, condition, and bid amount on the government or authorized auction site.
@@ -609,13 +688,13 @@ export default function App() {
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block bg-zinc-950/50 rounded-2xl p-4 border border-zinc-800/40 hover:border-emerald-500/30 hover:bg-zinc-900/50 transition-all duration-300"
+                    className="block rounded-xl border border-emerald-100 bg-white p-4 transition-colors hover:border-emerald-300 hover:bg-emerald-50/50"
                   >
-                    <div className="text-sm font-bold text-zinc-200 flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
                       {s.name}
-                      <ArrowUpRight className="w-3 h-3 text-zinc-500" />
+                      <ArrowUpRight className="h-3 w-3 text-emerald-700" />
                     </div>
-                    <div className="text-xs text-zinc-500 mt-0.5">{s.desc}</div>
+                    <div className="mt-1 text-xs leading-relaxed text-slate-500">{s.desc}</div>
                   </a>
                 ))}
               </div>
@@ -625,10 +704,10 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-800/60 py-8 px-4">
+      <footer className="border-t border-slate-200 bg-slate-50 px-4 py-8">
         <div className="max-w-7xl mx-auto text-center">
-          <p className="text-xs text-zinc-600">
-            Tax Lien Hunter — Auction research for educational purposes, not legal or financial advice.
+          <p className="text-xs text-slate-500">
+            Tax Deed &amp; Lien Hunter — Auction research for educational purposes, not legal or financial advice.
             Verify every listing with the government auction source before investing.
           </p>
         </div>
@@ -643,6 +722,13 @@ export default function App() {
           screening={screeningById.get(selectedProperty.id)}
           screeningRank={screeningRankById.get(selectedProperty.id)}
           onClose={() => setSelectedProperty(null)}
+          userId={accountUserId}
+          paidAccess={hasPrivateAccess}
+          tracker={trackerByPropertyId.get(selectedProperty.id)}
+          onTrack={async (propertyId, status) => {
+            try { await updateTracker(propertyId, status); showToast('Tracking status updated', 'success') }
+            catch (error) { showToast(error instanceof Error ? error.message : 'Unable to update tracking', 'error'); throw error }
+          }}
           onOpenCalculator={() => {
             setCalculatorProperty(selectedProperty)
             setSelectedProperty(null)

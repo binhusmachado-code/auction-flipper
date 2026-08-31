@@ -121,7 +121,7 @@ export default function OnboardingWizard({ onClose, onOpenCalculator, onOpenDire
           </div>
 
           {step === 0 && <div className="space-y-5">
-            <div><h3 className="text-2xl font-extrabold text-white">We stay with you through every stage.</h3><p className="mt-2 leading-relaxed text-zinc-400">Auction Flipper organizes the work and sends you to the verified county auction when an official action is required. Your passwords and property funds stay with the county or its authorized provider.</p></div>
+            <div><h3 className="text-2xl font-extrabold text-white">We stay with you through every stage.</h3><p className="mt-2 leading-relaxed text-zinc-400">Tax Deed &amp; Lien Hunter organizes the work and sends you to the verified county auction when an official action is required. Your passwords and property funds stay with the county or its authorized provider.</p></div>
             <IllustratedJourney />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4"><ShieldCheck className="h-5 w-5 flex-none text-emerald-400" /><div><div className="text-sm font-bold text-zinc-200">Guided inside our website</div><p className="mt-1 text-xs leading-relaxed text-zinc-500">Research, checklist, maximum bid, deposit estimate, deadlines, receipts, and saved progress.</p></div></div>
@@ -162,7 +162,7 @@ export default function OnboardingWizard({ onClose, onOpenCalculator, onOpenDire
             <div className="grid gap-4 sm:grid-cols-[1fr_250px]">
               <StepList items={[
                 { title: 'Open Official Auction', detail: 'Use the button on the property page so you land on the correct county provider.' },
-                { title: 'Select Register', detail: 'Create the vendor account directly. Never give Auction Flipper that password.' },
+                { title: 'Select Register', detail: 'Create the vendor account directly. Never give Tax Deed & Lien Hunter that password.' },
                 { title: 'Verify identity and email', detail: 'Enter the legal bidder details, tax information, and name that should appear on title.' },
                 { title: 'Wait for approval', detail: 'Do not fund or bid until the official site shows an approved bidder number.' },
               ]} />

@@ -7,17 +7,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
   try {
     const user = await authenticatedUser(req)
-    const plan = req.body?.plan === 'yearly' ? 'yearly' : req.body?.plan === 'monthly' ? 'monthly' : null
-    if (!plan) return res.status(400).json({ error: 'Choose a valid membership plan' })
+    const tier = req.body?.tier === 'investor' || req.body?.tier === 'pro' ? req.body.tier : null
+    const interval = req.body?.interval === 'month' || req.body?.interval === 'year' ? req.body.interval : null
+    if (!tier || !interval) return res.status(400).json({ error: 'Choose a valid membership plan' })
+    const plan = `${tier}_${interval === 'month' ? 'monthly' : 'yearly'}` as const
 
     const secret = process.env.STRIPE_SECRET_KEY
-    const priceId = plan === 'yearly' ? process.env.STRIPE_PRICE_YEARLY : process.env.STRIPE_PRICE_MONTHLY
+    const priceKey = `STRIPE_PRICE_${tier.toUpperCase()}_${interval === 'month' ? 'MONTHLY' : 'YEARLY'}`
+    const priceId = process.env[priceKey]
     if (!secret || !priceId) return res.status(503).json({ error: 'Membership checkout is not configured yet' })
 
     const stripe = new Stripe(secret)
-    const expectedPrice = plan === 'yearly'
-      ? { amount: 55_000, interval: 'year' }
-      : { amount: 8_900, interval: 'month' }
+    const expectedAmounts = {
+      investor: { month: 2_900, year: 29_000 },
+      pro: { month: 6_900, year: 69_000 },
+    }
+    const expectedPrice = { amount: expectedAmounts[tier][interval], interval }
     const configuredPrice = await stripe.prices.retrieve(priceId)
     if (
       !configuredPrice.active ||
@@ -25,16 +30,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       configuredPrice.unit_amount !== expectedPrice.amount ||
       configuredPrice.recurring?.interval !== expectedPrice.interval
     ) {
-      return res.status(503).json({ error: `The configured ${plan} Stripe price does not match the published membership price` })
+      return res.status(503).json({ error: `The configured ${tier} ${interval} price does not match the published membership price` })
     }
 
     const admin = adminClient()
     const { data: existing } = await admin
       .from('subscriptions')
-      .select('stripe_customer_id, status')
+      .select('stripe_customer_id, status, tier, current_period_end')
       .eq('user_id', user.id)
       .maybeSingle()
-    if (existing?.status === 'active' || existing?.status === 'trialing') {
+    const existingPaidActive = (existing?.tier === 'investor' || existing?.tier === 'pro')
+      && (existing?.status === 'active' || existing?.status === 'trialing')
+      && Boolean(existing?.current_period_end && new Date(existing.current_period_end).getTime() > Date.now())
+    if (existingPaidActive) {
       return res.status(409).json({ error: 'This account already has an active membership. Use Manage billing instead.' })
     }
 
@@ -45,7 +53,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         metadata: { supabase_user_id: user.id },
       })
       customerId = customer.id
-      await admin.from('subscriptions').upsert({ user_id: user.id, stripe_customer_id: customerId, status: 'incomplete' })
+      await admin.from('subscriptions').upsert({
+        user_id: user.id,
+        stripe_customer_id: customerId,
+        tier: 'free',
+        status: 'incomplete',
+      })
     }
 
     const origin = requestOrigin(req)
@@ -54,10 +67,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       customer: customerId,
       client_reference_id: user.id,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/#/membership?checkout=success`,
-      cancel_url: `${origin}/#/membership?checkout=cancelled`,
-      subscription_data: { metadata: { supabase_user_id: user.id, plan } },
-      metadata: { supabase_user_id: user.id, plan },
+      success_url: `${origin}/#/pricing?checkout=success`,
+      cancel_url: `${origin}/#/pricing?checkout=cancelled`,
+      allow_promotion_codes: true,
+      subscription_data: { metadata: { supabase_user_id: user.id, plan, tier, billing_interval: interval } },
+      metadata: { supabase_user_id: user.id, plan, tier, billing_interval: interval },
     })
 
     if (!session.url) throw new Error('Stripe did not return a checkout URL')

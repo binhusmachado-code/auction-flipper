@@ -43,7 +43,7 @@ export default function PropertyMedia({ property }: Props) {
   }, [property.id, property.imageUrl])
 
   return (
-    <div className="relative aspect-[16/9] overflow-hidden border-b border-zinc-800/60 bg-zinc-950">
+    <div className="relative aspect-[16/10] overflow-hidden border-b border-slate-200 bg-slate-100">
       {showPhoto ? (
         <img
           src={property.imageUrl}
@@ -61,22 +61,17 @@ export default function PropertyMedia({ property }: Props) {
             onError={() => setMapFailed(true)}
             className="h-full w-full object-cover opacity-90"
           />
-          <MapPin className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-full fill-emerald-500 text-zinc-950 drop-shadow-lg" />
+          <MapPin className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-full fill-emerald-700 text-white drop-shadow-lg" />
           <span className="absolute bottom-1.5 right-2 text-[9px] font-medium text-zinc-700">Map © Esri contributors</span>
         </>
       ) : (
-        <div className="flex h-full items-center justify-center bg-zinc-900 px-8 text-center">
+        <div className="flex h-full items-center justify-center bg-slate-100 px-8 text-center">
           <div>
-            <MapPin className="mx-auto h-8 w-8 text-emerald-400" />
-            <div className="mt-2 text-xs font-semibold text-zinc-300">Open the address map</div>
+            <MapPin className="mx-auto h-8 w-8 text-emerald-700" />
+            <div className="mt-2 text-xs font-semibold text-slate-600">Open the address map</div>
           </div>
         </div>
       )}
-
-      <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-lg border border-black/20 bg-zinc-950/85 px-2.5 py-1 text-[10px] font-bold uppercase text-zinc-200 backdrop-blur-sm">
-        <MapPin className="h-3 w-3 text-emerald-400" />
-        {showPhoto ? 'Property photo' : 'Map location'}
-      </div>
 
       {!showPhoto && (
         <a
@@ -84,7 +79,7 @@ export default function PropertyMedia({ property }: Props) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Open map for ${property.address}`}
-          className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-black/20 bg-zinc-950/85 text-zinc-200 backdrop-blur-sm transition-colors hover:bg-emerald-500 hover:text-zinc-950"
+          className="absolute bottom-3 left-3 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/60 bg-white/90 text-slate-700 shadow-sm transition-colors hover:bg-emerald-700 hover:text-white"
         >
           <ArrowUpRight className="h-4 w-4" />
         </a>

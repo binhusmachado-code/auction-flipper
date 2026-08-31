@@ -1,6 +1,8 @@
-# 🔨 Auction Flipper
+# Tax Deed & Lien Hunter
 
-Property auction deal finder — discover foreclosure, REO, and courthouse auction properties to flip for profit.
+Auction research workspace — discover official tax-deed and tax-lien records, document due diligence, calculate a maximum bid, and keep every deadline visible.
+
+> Open the app through a web server. Opening `index.html` directly with a `file://` URL will not load the React modules. Run `npm run dev`, then open <http://localhost:5173/>.
 
 ## 🌐 Live Sites (Free Domains)
 
@@ -15,7 +17,8 @@ Both are **completely free** — no credit card or domain purchase needed.
 
 - React 18 + Vite + TypeScript
 - Tailwind CSS + Leaflet maps
-- Supabase (PostgreSQL + Auth) — 50 sample properties seeded
+- Supabase (PostgreSQL + Auth) — property records, tiered memberships, saved searches, tracking, notes, documents, and learning progress
+- Stripe Billing — Investor and Pro recurring memberships
 - PWA — installable on mobile/desktop
 
 ## 🛠️ Development Workflow
@@ -37,9 +40,18 @@ git push origin main  # → auto-deploys to production
 ## ⚙️ Supabase Backend
 
 - **Project**: `weguwjxuvibbyqrrvqcw` (us-east-1)
-- **Tables**: `properties`, `user_favorites`, `user_alerts`, `profiles`
+- **Tables**: `properties`, `profiles`, `subscriptions`, `user_favorites`, `user_alerts`, `saved_searches`, `property_tracking`, `property_notes`, `property_documents`, `property_source_records`, `learning_progress`, `service_requests`
 - **Auth**: Email/password with auto-profile creation
 - **RLS**: Row-level security per user
+- **Product migration**: apply `supabase/migrations/202608300001_product_expansion.sql` after the existing membership/security migrations
+
+### Membership tiers
+
+- **Free** — official-source previews, 5 tracked properties, 1 saved search, and the learning center.
+- **Investor** — complete records, 100 tracked properties, 10 searches, daily alerts, calculator, calendar, table, and CSV export ($29/month or $290/year).
+- **Pro** — 500 tracked properties, 20 searches, instant alerts, advanced reports, and priority support ($69/month or $690/year).
+
+Stripe price IDs and deployment steps are documented in `.env.example`, `plans/product-expansion-plan.md`, and `docs/OWNER-ADMIN-SETUP.md`.
 
 ## 📱 PWA Install
 

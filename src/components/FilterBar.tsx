@@ -60,23 +60,23 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
     filter.keyword
 
   return (
-    <div className="bg-zinc-900/50 backdrop-blur-sm border border-zinc-800/60 rounded-2xl p-5 mb-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <div className="relative sm:col-span-2 xl:col-span-2">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+    <div className="mb-7 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3 shadow-sm sm:p-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-8">
+        <div className="relative col-span-2 xl:col-span-3">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search address, city, parcel ID..."
             value={filter.keyword}
             onChange={(e) => update({ keyword: e.target.value })}
-            className="w-full pl-10 pr-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/30 transition-all"
+            className="w-full rounded-lg border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-medium text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15"
           />
         </div>
 
         <select
           value={filter.state}
           onChange={(e) => update({ state: e.target.value })}
-          className="px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15"
         >
           <option value="">All States</option>
           {states.map((s) => (
@@ -87,7 +87,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
         <select
           value={filter.county}
           onChange={(e) => update({ county: e.target.value })}
-          className="px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15"
         >
           <option value="">All Counties</option>
           {counties.map((county) => (
@@ -96,9 +96,18 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
         </select>
 
         <select
+          value={filter.propertyType}
+          onChange={(e) => update({ propertyType: e.target.value })}
+          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15"
+        >
+          <option value="">All Properties</option>
+          {PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+        </select>
+
+        <select
           value={filter.saleType}
           onChange={(e) => update({ saleType: e.target.value })}
-          className="px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15"
         >
           <option value="">Lien & Deed</option>
           {SALE_TYPES.map((t) => (
@@ -110,7 +119,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           value={filter.sortBy}
           onChange={(e) => update({ sortBy: e.target.value as DealFilter['sortBy'] })}
           aria-label="Sort listings"
-          className="px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-700 shadow-sm focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/15"
         >
           <option value="auction-soonest">Auction: soonest</option>
           <option value="price-low">Listed amount: low to high</option>
@@ -122,13 +131,13 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
         </select>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-emerald-100 pt-3">
         <button
           onClick={() => update({ analysisStatus: filter.analysisStatus === 'complete' ? '' : 'complete' })}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
             filter.analysisStatus === 'complete'
-              ? 'bg-emerald-500 text-zinc-950'
-              : 'bg-zinc-950 border border-zinc-800/60 text-zinc-400 hover:bg-zinc-800'
+              ? 'bg-emerald-800 text-white'
+              : 'border border-slate-300 bg-white text-slate-700 hover:border-emerald-700'
           }`}
           title="Only show properties with a completed evidence-based analysis"
         >
@@ -140,21 +149,21 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           onClick={() => setShowAdvanced(!showAdvanced)}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
             showAdvanced
-              ? 'bg-emerald-500 text-zinc-950'
-              : 'bg-zinc-950 border border-zinc-800/60 text-zinc-300 hover:bg-zinc-800'
+              ? 'bg-emerald-800 text-white'
+              : 'border border-slate-300 bg-white text-slate-700 hover:border-emerald-700'
           }`}
         >
           <SlidersHorizontal className="w-4 h-4" />
           Filters
           {isFiltered && (
-            <span className="ml-0.5 w-2 h-2 bg-emerald-400 rounded-full" />
+            <span className="ml-0.5 h-2 w-2 rounded-full bg-emerald-500" />
           )}
         </button>
 
         {isFiltered && (
           <button
             onClick={clear}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-900 transition-colors"
           >
             <X className="w-4 h-4" />
             Clear
@@ -163,27 +172,13 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
       </div>
 
       {showAdvanced && (
-        <div className="grid grid-cols-1 gap-3 border-t border-zinc-800/60 pt-4 mt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 animate-fade-in">
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Property Type</label>
-            <select
-              value={filter.propertyType}
-              onChange={(e) => update({ propertyType: e.target.value })}
-              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
-            >
-              <option value="">All Types</option>
-              {PROPERTY_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-
+        <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 animate-fade-in [&_label]:text-slate-500 [&_input]:border-slate-300 [&_input]:bg-white [&_input]:text-slate-800 [&_select]:border-slate-300 [&_select]:bg-white [&_select]:text-slate-800">
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-[0.1em] text-zinc-500 mb-1.5">Auction Type</label>
             <select
               value={filter.auctionType}
               onChange={(e) => update({ auctionType: e.target.value })}
-              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+              className="w-full cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
             >
               <option value="">All Auctions</option>
               {AUCTION_TYPES.map((type) => (
@@ -201,7 +196,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
               placeholder="No minimum"
               value={filter.minPrice || ''}
               onChange={(e) => update({ minPrice: Math.max(0, Number(e.target.value) || 0) })}
-              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
             />
           </div>
 
@@ -214,7 +209,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
               placeholder="No maximum"
               value={filter.maxPrice === MAX_PRICE ? '' : filter.maxPrice}
               onChange={(e) => update({ maxPrice: Math.max(0, Number(e.target.value) || MAX_PRICE) })}
-              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
             />
           </div>
 
@@ -223,7 +218,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
             <select
               value={filter.minInterestRate}
               onChange={(e) => update({ minInterestRate: Number(e.target.value) })}
-              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+              className="w-full cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
             >
               <option value={0}>Any</option>
               <option value={10}>10%+</option>
@@ -238,7 +233,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
             <select
               value={filter.maxRedemptionPeriod}
               onChange={(e) => update({ maxRedemptionPeriod: Number(e.target.value) })}
-              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+              className="w-full cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
             >
               <option value={60}>Any</option>
               <option value={6}>6 months</option>
@@ -253,7 +248,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
             <select
               value={filter.analysisStatus}
               onChange={(e) => update({ analysisStatus: e.target.value as DealFilter['analysisStatus'] })}
-              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+              className="w-full cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
             >
               <option value="">Any Status</option>
               <option value="complete">Analysis Complete</option>
@@ -267,7 +262,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
             <select
               value={filter.dealGrade}
               onChange={(e) => update({ dealGrade: e.target.value as DealFilter['dealGrade'] })}
-              className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800/60 rounded-xl text-sm font-medium text-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 cursor-pointer"
+              className="w-full cursor-pointer rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
             >
               <option value="">Any Grade</option>
               <option value="Great">Great</option>
@@ -279,7 +274,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           <button
             type="button"
             onClick={() => update({ verifiedValueOnly: !filter.verifiedValueOnly })}
-            className={`flex h-[42px] items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-bold ${filter.verifiedValueOnly ? 'border-emerald-500 bg-emerald-500 text-zinc-950' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+            className={`flex h-[42px] items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-bold ${filter.verifiedValueOnly ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-600 hover:border-emerald-600'}`}
           >
             <BadgeCheck className="h-4 w-4" />Verified value
           </button>
@@ -287,7 +282,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           <button
             type="button"
             onClick={() => update({ mappedOnly: !filter.mappedOnly })}
-            className={`flex h-[42px] items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-bold ${filter.mappedOnly ? 'border-emerald-500 bg-emerald-500 text-zinc-950' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+            className={`flex h-[42px] items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-bold ${filter.mappedOnly ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-600 hover:border-emerald-600'}`}
           >
             <MapPin className="h-4 w-4" />Mapped
           </button>
@@ -295,7 +290,7 @@ export default function FilterBar({ filter, states, counties, onChange }: Props)
           <button
             type="button"
             onClick={() => update({ auctionDateKnownOnly: !filter.auctionDateKnownOnly })}
-            className={`flex h-[42px] items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-bold ${filter.auctionDateKnownOnly ? 'border-emerald-500 bg-emerald-500 text-zinc-950' : 'border-zinc-800 bg-zinc-950 text-zinc-400'}`}
+            className={`flex h-[42px] items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-bold ${filter.auctionDateKnownOnly ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-600 hover:border-emerald-600'}`}
           >
             <CalendarCheck className="h-4 w-4" />Sale date known
           </button>

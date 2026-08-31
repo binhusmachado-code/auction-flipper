@@ -2,7 +2,7 @@
 
 ## Product Decision
 
-Build Auction Flipper as a paid research and education service for first-time Florida tax-deed buyers. It should help a member find an auction, understand a parcel, complete due diligence, and calculate a conservative maximum bid. It should never imply that assessed value is market value, guarantee title, guarantee profit, or place a bid for the member.
+Build Auction Flipper as a nationwide paid research and education service for first-time tax-sale buyers. The product scope is all 50 states plus Washington, D.C., including tax certificates, tax liens, tax deeds, redeemable deeds, foreclosure-style tax sales, and officially published unsold inventory. It should help a member find an auction, understand exactly what is being sold, complete jurisdiction-specific due diligence, and calculate a conservative maximum bid or certificate rate. It should never imply that assessed value is market value, guarantee title, guarantee profit, or place a bid for the member.
 
 The existing public GitHub Pages site can remain a preview and county calendar. Paid property data, saved work, calculations, and learning progress must move behind authenticated database access. GitHub Pages is static hosting, so hiding a page in the React interface is not a real paywall when the data is bundled into downloadable JSON.
 
@@ -18,14 +18,14 @@ The existing public GitHub Pages site can remain a preview and county calendar. 
 - County, sale type, opening-bid range, property type, auction type, search, and sorting controls are implemented locally.
 - Generated demo properties have been removed from the production fallback so customers are not shown invented listings.
 
-This is a good data prototype, but it is not ready to charge customers until access control, billing, data monitoring, the analysis model, onboarding, policies, and support operations are complete.
+This is a good Florida data prototype, but it is not nationwide coverage and is not ready to charge customers until access control, billing, data monitoring, the analysis model, onboarding, policies, support operations, and transparent national coverage reporting are complete.
 
 ## Recommended Offer
 
 ### Public Preview
 
-- Upcoming Florida auction calendar.
-- Supported-county coverage and freshness page.
+- Upcoming nationwide auction calendar with state and sale-type filters.
+- State and supported-jurisdiction coverage and freshness page.
 - Three clearly labeled preview properties.
 - A beginner explanation of tax deeds versus tax liens.
 - Pricing, terms, privacy, refund policy, and sign-in.
@@ -79,10 +79,10 @@ Ask only four useful questions:
 
 - Have you purchased real estate before?
 - What is your maximum available cash?
-- Which counties interest you?
+- Which states and local jurisdictions interest you?
 - Is your likely strategy resale, rental, land, or learning only?
 
-Use the answers to set a default county, budget filter, explanation level, and checklist. Do not use them to claim that a property is suitable for the customer.
+Use the answers to set default locations, budget filters, explanation level, sale type, and checklist. Do not use them to claim that a property is suitable for the customer.
 
 ### Guided Start
 
@@ -90,7 +90,7 @@ Use the answers to set a default county, budget filter, explanation level, and c
 2. A five-step tour points to auction dates, filters, property sources, the risk checklist, and the calculator.
 3. A practice property teaches the process without using a live auction.
 4. The member completes one guided analysis and sees why opening bid is not the expected purchase price.
-5. The member saves a county and auction alert.
+5. The member saves a state, jurisdiction, and auction alert.
 6. Before opening a live bidding site for the first time, the member acknowledges the buyer-beware warning.
 
 ### Learning Center
@@ -98,7 +98,7 @@ Use the answers to set a default county, budget filter, explanation level, and c
 Create six short lessons, each with captions, transcript, glossary links, and a three-question knowledge check:
 
 1. Tax deed versus tax lien.
-2. How a Florida property reaches a tax-deed auction.
+2. How tax certificates, liens, deeds, redeemable deeds, and tax foreclosures differ by state.
 3. Reading the official auction record and parcel record.
 4. Title, governmental liens, occupancy, access, zoning, flood, and condition risks.
 5. Calculating total cost and a maximum bid.
@@ -118,7 +118,7 @@ Each property page should answer five questions in order:
 
 ### Required Sections
 
-- Official status, auction date, county, case number, parcel ID, opening bid, and source links.
+- Official status, auction date, state, responsible jurisdiction, sale instrument, case number, parcel ID, opening bid or certificate amount, and source links.
 - Property photo when legitimately available; otherwise an exact parcel map.
 - Appraiser facts such as land use, assessed value, building area, year built, and lot size, each labeled by source and verification time.
 - Auction change history, including cancellations, redemptions, reschedules, and opening-bid changes.
@@ -136,7 +136,7 @@ Each property page should answer five questions in order:
 - Occupancy and exterior condition have been investigated without trespassing.
 - Title search and potentially surviving liens have been reviewed.
 - Code enforcement, utility, special assessment, and association issues have been investigated.
-- Current auction status has been rechecked directly with the county.
+- Current auction status has been rechecked directly with the responsible government office or its authorized platform.
 - Funds, deposit, payment deadline, recording fees, and post-sale process are understood.
 - Exit strategy and title-insurability plan have been reviewed with the appropriate professional.
 
@@ -183,7 +183,7 @@ maximum bid = (net sale proceeds - all non-bid costs - target profit)
               / (1 + buyer-premium rate)
 ```
 
-The deposit is part of the winning bid, not an extra project cost. Florida's statutory high-bidder deposit is generally $200 or 5% of the final bid, whichever is greater, but the interface must display the county's current rule and direct the member to verify it.
+The deposit is part of the winning bid, not an extra project cost. Deposit and payment rules must come from the current law and operating instructions for the specific sale. Florida's statutory high-bidder deposit is generally $200 or 5% of the final bid, whichever is greater, but that rule must not be shown for another state.
 
 ### Accuracy Standard
 
@@ -196,7 +196,7 @@ The deposit is part of the winning bid, not an extra project cost. Florida's sta
 
 ## Auction Data System
 
-Create one normalized adapter per county or auction platform with these responsibilities:
+Create one normalized adapter per responsible government jurisdiction or authorized auction platform with these responsibilities:
 
 - Discover future sales.
 - Fetch every active case.
@@ -208,25 +208,26 @@ Create one normalized adapter per county or auction platform with these responsi
 
 ### Update Schedule
 
-- Discover county calendars daily.
+- Discover state and local auction calendars daily.
 - Refresh future property lists at least every six hours.
 - Refresh auctions inside the next 72 hours every hour.
 - Run a final status refresh shortly before the sale.
-- Keep the last successful snapshot if a county source is temporarily unavailable, but mark it Cached or Stale rather than Verified.
-- Alert the operator when a source fails, the record count unexpectedly drops, or freshness exceeds the service target.
+- Keep the last successful snapshot if a source is temporarily unavailable, but mark it Cached or Stale rather than Verified.
+- Alert the operator when a source fails, the record count unexpectedly drops, a legal-rule record expires, or freshness exceeds the service target.
 
 ### Coverage Standard
 
-- Publish a coverage page listing every county as Live, Partial, In development, No future auction published, or Source unavailable.
-- Never advertise all Florida counties until all 67 have a monitored adapter or an explicitly documented no-sale state.
-- Add the remaining counties in batches based on auction volume and shared platform, then validate each against the official clerk calendar.
+- Publish a national coverage page for all 50 states and Washington, D.C. Each state must show Live parcels, Auction events only, Partial, In development, No future auction published, or Source unavailable.
+- Within each state, list the responsible counties, municipalities, parishes, boroughs, sheriffs, treasurers, collectors, clerks, land banks, or authorized platforms that are actually monitored.
+- Never advertise a state as fully live until the advertised selling jurisdictions have monitored adapters and current rules. Do not turn an unverified directory link into a live property record.
+- Add jurisdictions in platform-based batches, then validate each against the responsible government calendar, rules, and inventory.
 - Keep Brevard September and October and every later published Brevard auction in the same automated discovery process. Do not hard-code only those two dates.
 
 ## Admin And Customer Operations
 
 Build a private operator dashboard for:
 
-- County-feed status, last success, failures, record counts, and stale auctions.
+- State and jurisdiction feed status, last success, failures, record counts, rule freshness, and stale auctions.
 - Customer accounts, subscription status, onboarding progress, and support notes.
 - Refund and cancellation workflow through Stripe.
 - Content and video publishing.
@@ -237,7 +238,7 @@ Build a private operator dashboard for:
 Send members:
 
 - Welcome and onboarding emails.
-- New-auction and saved-county alerts.
+- New-auction and saved-state or jurisdiction alerts.
 - Saved-property status-change alerts.
 - Auction reminders at configurable times.
 - Payment-failure and trial/renewal messages.
@@ -245,13 +246,13 @@ Send members:
 
 ## Legal And Trust Requirements
 
-Before charging customers, have a Florida attorney review the Terms of Service, membership disclosures, refund/cancellation policy, privacy policy, data-source terms, and all investment-related wording.
+Before charging customers, have qualified counsel review the Terms of Service, membership disclosures, refund/cancellation policy, privacy policy, data-source terms, and all investment-related wording. Add state-specific legal review before publishing detailed legal interpretations or automated risk conclusions for that state.
 
 The product must clearly state:
 
 - It is a research and education service, not legal, title, appraisal, brokerage, tax, or investment advice.
 - Auction status and property facts can change at any time.
-- The county record and auction platform control if the app conflicts with them.
+- The responsible government record and authorized auction platform control if the app conflicts with them.
 - Tax deeds do not guarantee clear or insurable title.
 - Properties are commonly sold as-is and require independent research.
 - Members are responsible for verifying title, liens, use, access, occupancy, condition, funds, and deadlines before bidding.
@@ -265,7 +266,7 @@ Avoid marketing claims such as guaranteed deal, verified profit, clear title, sa
 
 - Publish the 172 official future records and remove demo data.
 - Finish the current photo/map, filter, sort, source-link, mobile, and auction-calendar release.
-- Show exact current county coverage and freshness.
+- Show exact current state and jurisdiction coverage and freshness.
 - Acceptance: every listing is official, future-dated, source-linked, and visually usable on phone and desktop.
 
 ### Phase 1: Protected Data Foundation
@@ -299,11 +300,11 @@ Avoid marketing claims such as guaranteed deal, verified profit, clear title, sa
 - Add first-login questions, product tour, practice deal, six lessons, transcripts, quizzes, glossary, and progress.
 - Acceptance: a first-time buyer completes a practice analysis and saves an alert in 15 minutes or less.
 
-### Phase 6: County Expansion And Monitoring
+### Phase 6: Nationwide Expansion And Monitoring
 
-- Add Florida counties in platform-based batches.
-- Add source failure alerts, count anomaly checks, change history, and the public coverage page.
-- Acceptance: every advertised county meets the freshness target and has a tested official-source path.
+- Add every state and Washington, D.C. through platform-based and jurisdiction-based connector batches.
+- Add source failure alerts, count anomaly checks, legal-rule freshness, change history, and the public national coverage page.
+- Acceptance: every advertised state and jurisdiction meets the published coverage status, freshness target, and tested official-source path.
 
 ### Phase 7: Private Beta And Launch
 

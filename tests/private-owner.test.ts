@@ -17,13 +17,14 @@ test('national directory contains all states, DC, and Census county equivalents'
   assert.equal(data.states.some((state) => state.abbreviation === 'PR'), false)
 })
 
-test('owner login has no signup, subscription, or price controls', () => {
+test('customer access exposes signup, pricing, and keeps admin controls gated', () => {
   const auth = read('../src/components/AuthModal.tsx')
   const app = read('../src/App.tsx')
 
-  assert.match(auth, /Owner access only/)
+  assert.match(auth, /signUp/)
   assert.match(auth, /signInWithPassword/)
-  assert.doesNotMatch(auth, /signUp|checkout|membership|monthly|yearly|\$89|\$550/i)
-  assert.doesNotMatch(app, /public preview|view membership|start membership|create account/i)
+  assert.match(app, /PublicHome/)
+  assert.match(app, /startCheckout/)
+  assert.match(app, /public preview|Free preview/i)
   assert.match(app, /profile\?\.role === 'admin'/)
 })

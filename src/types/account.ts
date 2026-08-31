@@ -18,7 +18,8 @@ export interface AdminCustomer {
   accountStatus: 'active' | 'suspended'
   accessStatus: CustomerAccessStatus
   manualAccessUntil: string | null
-  plan: 'monthly' | 'yearly' | null
+  plan: 'monthly' | 'yearly' | 'investor_monthly' | 'investor_yearly' | 'pro_monthly' | 'pro_yearly' | null
+  tier?: 'free' | 'investor' | 'pro'
   subscriptionStatus: string
   currentPeriodEnd: string | null
   cancelAtPeriodEnd: boolean

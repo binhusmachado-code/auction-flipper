@@ -11,7 +11,7 @@ function optionalNumber(value: unknown): number | undefined {
   return value === null || value === undefined || value === '' ? undefined : Number(value)
 }
 
-function normalizeProperty(row: PropertyRecord): Property {
+export function normalizeProperty(row: PropertyRecord): Property {
   const auctionType = String(row.auction_type ?? row.auctionType ?? 'Government') as Property['auctionType']
   const rawSaleType = row.sale_type ?? row.saleType
   const saleType = rawSaleType === 'Tax Lien' || rawSaleType === 'Tax Deed'
@@ -69,6 +69,35 @@ function normalizeProperty(row: PropertyRecord): Property {
 }
 
 const officialTaxDeedProperties = (taxDeedProperties as PropertyRecord[]).map(normalizeProperty)
+
+function currentPreviewProperties() {
+  const today = new Date().toISOString().slice(0, 10)
+  return officialTaxDeedProperties
+    .filter((property) => property.status === 'Active' && (!property.auctionDate || property.auctionDate >= today))
+    .slice(0, 6)
+}
+
+export function usePublicPropertyPreviews() {
+  const [properties, setProperties] = useState<Property[]>(currentPreviewProperties())
+  const [loading, setLoading] = useState(isSupabaseConfigured)
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    supabase.rpc('list_property_previews', { limit_count: 6 }).then(({ data, error }: any) => {
+      if (cancelled) return
+      if (!error && data?.length) setProperties((data as PropertyRecord[]).map(normalizeProperty))
+      if (!error && !data?.length) setProperties(currentPreviewProperties())
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  return { properties, loading }
+}
 
 export function useSupabaseAuth() {
   const [user, setUser] = useState<any>(null)

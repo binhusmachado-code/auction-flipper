@@ -2,15 +2,15 @@
 
 ## What is now available
 
-- Customers can create an account, sign in, reset their password, open a dashboard, manage billing, and save a guided bid workflow.
+- Customers can create a free account, sign in, reset their password, preview upcoming auctions, save searches, track properties, follow lessons, and upgrade to Investor or Pro.
 - The owner dashboard can invite customers, edit their name and email, grant temporary access, suspend access, send password resets, promote another administrator, and permanently delete an account.
 - Every owner customer-management action is recorded in `admin_audit_log`.
 - Admin access is checked on the server. Changing browser code or local storage cannot turn a customer into an owner.
 
 ## One-time owner activation
 
-1. Deploy migrations `202608210001_paid_membership.sql` through `202608210004_security_hardening.sql` to the production Supabase project in order. These are already installed in the current production project.
-2. Open the website, select **Membership**, create the owner's account, and confirm the email address.
+1. Deploy migrations `202608210001_paid_membership.sql` through `202608210004_security_hardening.sql`, then `202608300001_product_expansion.sql`, to the production Supabase project in order. The expansion migration adds tiered access, saved searches, tracking, notes/documents, source verification, lesson progress, and secure document storage.
+2. Open the website, select **Start free**, create the owner's account, and confirm the email address.
 3. In the Supabase SQL Editor, replace the placeholder email and run:
 
 ```sql
@@ -45,7 +45,10 @@ When billing is enabled, set these private values only in Vercel:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `APP_URL`
 - `ALLOWED_APP_ORIGINS`
-- Stripe keys and exact monthly/yearly price IDs
+- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_INVESTOR_MONTHLY`, `STRIPE_PRICE_INVESTOR_YEARLY`, `STRIPE_PRICE_PRO_MONTHLY`, and `STRIPE_PRICE_PRO_YEARLY`
+
+The four Stripe Prices must be recurring USD Prices for $29/month, $290/year, $69/month, and $690/year respectively. The checkout endpoint validates the amount and interval before creating a subscription.
 
 Never expose `SUPABASE_SERVICE_ROLE_KEY` with a `VITE_` prefix.
 
