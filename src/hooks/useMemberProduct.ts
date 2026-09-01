@@ -240,7 +240,7 @@ export function usePropertyResearch(userId: string | null, propertyId: string | 
       )
       const displayUrls = new Map((signedPhotos ?? []).map((photo) => [photo.path, photo.signedUrl]))
       mappedDocuments.forEach((document) => {
-        document.displayUrl = displayUrls.get(document.storagePath)
+        document.displayUrl = displayUrls.get(document.storagePath) ?? undefined
       })
     }
     setNotes(((notesResult.data ?? []) as Row[]).map(mapNote))
