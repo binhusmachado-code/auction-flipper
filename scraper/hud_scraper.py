@@ -195,7 +195,7 @@ def map_property(raw: Dict) -> Dict:
         "state": raw.get("propertyState", ""),
         "zip": raw.get("propertyZip", ""),
         "price": int(list_price),
-        "estimated_value": int(list_price),  # HUD doesn't provide estimated value; use list price
+        "estimated_value": 0,
         "beds": beds,
         "baths": baths,
         "sqft": sqft,

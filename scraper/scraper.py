@@ -6,7 +6,7 @@ Fetches live foreclosure/auction listings from free US sources.
 Usage:
     python3 scraper.py              # Generate enhanced sample data + try live sources
     python3 scraper.py --hud         # Scrape HUD Home Store (requires Playwright)
-    python3 scraper.py --output ../src/data/live_properties.json
+    python3 scraper.py --output ./output/live_properties.json
 """
 
 import json
@@ -227,11 +227,7 @@ class HUDScraper(BaseScraper):
         beds = self._extract_number(card, ".beds, [class*='bed']")
         baths = self._extract_number(card, ".baths, [class*='bath']")
         sqft = self._extract_number(card, ".sqft, [class*='sqft']")
-        image = self._extract_attr(card, "img", "src") or "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"
-        
-        estimated = int(price * 1.6) if price > 0 else 0
-        arv = int(price * 1.8) if price > 0 else 0
-        rehab = int(price * 0.3) if price > 0 else 0
+        image = self._extract_attr(card, "img", "src") or ""
         
         return ScrapedProperty(
             id=f"hud-{hash(address) & 0xFFFFFFFF}",
@@ -240,7 +236,7 @@ class HUDScraper(BaseScraper):
             state=state or "",
             zip=zip_code or "",
             price=price,
-            estimated_value=estimated,
+            estimated_value=0,
             beds=beds or 0,
             baths=baths or 0,
             sqft=sqft or 0,
@@ -253,8 +249,8 @@ class HUDScraper(BaseScraper):
             source_url=self.BASE_URL,
             description=f"HUD REO property. Listed at ${price:,}.",
             image_url=image,
-            rehab_estimate=rehab,
-            arv=arv,
+            rehab_estimate=0,
+            arv=0,
             notes="Scraped from HUD Home Store. Verify details before bidding.",
         )
     
@@ -340,9 +336,9 @@ class AuctionComScraper(BaseScraper):
             return None
         
         price = int(item.get("price", 0) or item.get("openingBid", 0))
-        estimated = int(item.get("estValue", 0) or price * 1.5)
-        arv = int(item.get("arv", 0) or estimated * 1.1)
-        rehab = int(item.get("rehab", 0) or price * 0.25)
+        estimated = int(item.get("estValue", 0) or 0)
+        arv = int(item.get("arv", 0) or 0)
+        rehab = int(item.get("rehab", 0) or 0)
         
         return ScrapedProperty(
             id=f"auction-{item.get('id', hash(address) & 0xFFFFFFFF)}",
@@ -363,7 +359,7 @@ class AuctionComScraper(BaseScraper):
             source="Auction.com",
             source_url=f"{self.BASE_URL}/listing/{item.get('id', '')}",
             description=item.get("description", f"Auction.com foreclosure listing."),
-            image_url=item.get("imageUrl", "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"),
+            image_url=item.get("imageUrl", ""),
             rehab_estimate=rehab,
             arv=arv,
             notes="Scraped from Auction.com. Verify auction date and deposit requirements.",
@@ -553,16 +549,18 @@ def merge_and_save(properties: List[ScrapedProperty], output_path: str, merge_wi
 
 def main():
     parser = argparse.ArgumentParser(description="Auction Flipper Property Scraper")
-    parser.add_argument("--output", "-o", default="../src/data/live_properties.json", help="Output JSON file path")
+    parser.add_argument("--output", "-o", default="./output/live_properties.json", help="Output JSON file path")
     parser.add_argument("--hud", action="store_true", help="Scrape HUD Home Store only")
     parser.add_argument("--auction", action="store_true", help="Scrape Auction.com only")
-    parser.add_argument("--sample", action="store_true", help="Generate enhanced sample data only")
+    parser.add_argument("--sample", action="store_true", help="Generate local development sample data only; never publish it")
     parser.add_argument("--all", action="store_true", help="Scrape all sources")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay between requests (seconds)")
     parser.add_argument("--no-merge", action="store_true", help="Don't merge with existing data")
     parser.add_argument("--supabase", action="store_true", help="Push to Supabase database")
     parser.add_argument("--count", type=int, default=50, help="Number of sample properties to generate")
     args = parser.parse_args()
+    if args.sample and args.supabase:
+        parser.error("Sample data is development-only and cannot be pushed to Supabase")
     
     print("=" * 60)
     print("🏠 Auction Flipper - Property Scraper")
@@ -584,7 +582,7 @@ def main():
         props = auction.scrape()
         all_properties.extend(props)
     
-    if args.all or args.sample or not all_properties:
+    if args.sample:
         sample = SampleDataScraper()
         props = sample.scrape(count=args.count)
         all_properties.extend(props)

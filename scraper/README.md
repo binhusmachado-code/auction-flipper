@@ -26,7 +26,7 @@ python3 scraper.py --auction
 python3 scraper.py --all
 
 # Custom output path
-python3 scraper.py --output ../src/data/live_properties.json
+python3 scraper.py --output ./output/live_properties.json
 
 # Generate fresh data without merging with existing
 python3 scraper.py --no-merge

@@ -76,7 +76,11 @@ export interface PropertyDocument {
   sizeBytes: number | null
   documentType: 'auction_notice' | 'title_search' | 'tax_record' | 'appraiser_record' | 'map' | 'photo' | 'other'
   verifiedAt: string | null
+  sourceUrl: string | null
+  documentDate: string | null
+  evidence: Record<string, unknown>
   createdAt: string
+  displayUrl?: string
 }
 
 export interface PropertySourceRecord {
@@ -88,6 +92,8 @@ export interface PropertySourceRecord {
   status: 'available' | 'stale' | 'unavailable'
   verifiedAt: string | null
   retrievedAt: string | null
+  official: boolean
+  evidence: Record<string, unknown>
 }
 
 export interface LessonProgress {

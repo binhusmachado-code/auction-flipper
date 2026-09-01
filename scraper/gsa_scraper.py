@@ -479,7 +479,7 @@ class GSAScraper:
         text_for_extraction = f"{item.get('itemName', '')} {item.get('lotInfo', '')}"
 
         price = self._parse_price(item)
-        estimated = int(price * 1.5) if price > 0 else 0
+        estimated = 0
         beds = self._extract_beds(text_for_extraction)
         baths = self._extract_baths(text_for_extraction)
         sqft = self._extract_sqft(text_for_extraction)

@@ -25,8 +25,19 @@ from irs_scraper import scrape_treasury_auctions
 from county_scraper import ForeclosureScraper
 from hud_scraper import scrape_hud_properties
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://weguwjxuvibbyqrrvqcw.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_JauuTENFT1-RfVMhL7FJPQ_VtSxzhGI")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+
+PLACEHOLDER_IMAGE_MARKERS = (
+    "unsplash.com", "noimage", "no-image", "placeholder", "default-image",
+    "fallback", "coming-soon",
+)
+
+
+def is_placeholder_image(value: Any) -> bool:
+    """Reject generic imagery that is not evidence of the listed parcel."""
+    url = str(value or "").strip().lower()
+    return not url.startswith("https://") or any(marker in url for marker in PLACEHOLDER_IMAGE_MARKERS)
 
 # Schema mapping: app field -> Supabase column
 KEY_MAP = {
@@ -43,6 +54,16 @@ KEY_MAP = {
     "caseNumber": "case_number",
     "openingBid": "opening_bid",
     "depositRequired": "deposit_required",
+    "sourceVerifiedAt": "source_verified_at",
+    "sellingAuthority": "selling_authority",
+    "legalDescription": "legal_description",
+    "registrationDeadline": "registration_deadline",
+    "paymentDeadline": "payment_deadline",
+    "photoSource": "photo_source",
+    "photoSourceName": "photo_source_name",
+    "photoSourceUrl": "photo_source_url",
+    "photoCapturedAt": "photo_captured_at",
+    "photoVerifiedAt": "photo_verified_at",
 }
 
 
@@ -79,18 +100,6 @@ def normalize_property(prop: Dict[str, Any]) -> Dict[str, Any]:
     row.setdefault("notes", "")
     row.setdefault("images", [])
     
-    # Calculate estimated_value if missing
-    if not row.get("estimated_value") and row.get("price"):
-        row["estimated_value"] = int(row["price"] * 1.5)
-    
-    # Calculate ARV if missing
-    if not row.get("arv") and row.get("price"):
-        row["arv"] = int(row["price"] * 1.8)
-    
-    # Calculate rehab_estimate if missing
-    if not row.get("rehab_estimate") and row.get("price"):
-        row["rehab_estimate"] = int(row["price"] * 0.3)
-    
     # Ensure arrays
     if "images" not in row or row["images"] is None:
         row["images"] = []
@@ -103,6 +112,25 @@ def normalize_property(prop: Dict[str, Any]) -> Dict[str, Any]:
         row["auction_type"] = "Foreclosure"
     elif src in ("IRS Auctions", "GSA Auctions"):
         row["auction_type"] = "Government"
+
+    # Keep image lineage beside the URL. Unknown images stay unverified and
+    # are not presented by the application as photos of the actual property.
+    if row.get("image_url") and is_placeholder_image(row.get("image_url")):
+        row["image_url"] = ""
+        row["images"] = []
+        row["photo_source"] = "unverified"
+        row["photo_source_name"] = None
+        row["photo_source_url"] = None
+        row["photo_captured_at"] = None
+        row["photo_verified_at"] = None
+    elif row.get("image_url"):
+        # This legacy multi-source pipeline cannot validate the listing asset
+        # itself. Only the host-allowlisted edge refresh may promote a photo.
+        row["photo_source"] = "unverified"
+        row["photo_source_name"] = None
+        row["photo_source_url"] = None
+        row["photo_captured_at"] = None
+        row["photo_verified_at"] = None
 
     # Coerce numeric fields to ints (scrapers may emit floats like 180000.0,
     # and Postgres integer columns reject the string form "180000.0")
@@ -119,39 +147,10 @@ def normalize_property(prop: Dict[str, Any]) -> Dict[str, Any]:
     return row
 
 
-def clear_supabase_properties():
-    """Delete ALL existing properties from Supabase (the fake ones)."""
-    print("🗑️  Clearing old fake data from Supabase...")
-    url = f"{SUPABASE_URL}/rest/v1/properties"
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
-    
-    # First, temporarily disable RLS or use service role if available
-    # For now, we need to delete everything. Since RLS allows SELECT for everyone
-    # but DELETE might be restricted, let's check what we can do.
-    # Actually, the RLS policy only allows INSERT for authenticated users.
-    # We need to use the service_role key or admin API.
-    
-    # Try DELETE with the current key
-    try:
-        resp = requests.delete(url, headers={**headers, "Prefer": "return=minimal"}, timeout=30)
-        if resp.status_code in (200, 204):
-            print(f"   ✅ Cleared all properties (status {resp.status_code})")
-            return True
-        else:
-            print(f"   ⚠️  DELETE returned {resp.status_code}: {resp.text[:200]}")
-            # Try alternative: delete one by one
-            return False
-    except Exception as e:
-        print(f"   ❌ Error clearing: {e}")
-        return False
-
-
 def push_to_supabase(properties: List[Dict[str, Any]], batch_size: int = 50) -> int:
     """Push properties to Supabase via REST API."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError("SUPABASE_URL and a scoped SUPABASE_KEY must be configured")
     if not properties:
         print("⚠️  No properties to push")
         return 0
@@ -249,7 +248,7 @@ def run_freddie_scraper() -> List[Dict]:
         props = scrape_homesteps(search_queries=queries, delay=1.0)
         # Fill missing fields
         for p in props:
-            p.setdefault("estimatedValue", p.get("price", 0))
+            p.setdefault("estimatedValue", 0)
             p.setdefault("lotSize", None)
             p.setdefault("yearBuilt", None)
             p.setdefault("daysOnMarket", 0)
@@ -332,7 +331,7 @@ def run_irs_scraper() -> List[Dict]:
         props = scrape_treasury_auctions(include_geocode=False)
         # Fill missing fields
         for p in props:
-            p.setdefault("estimatedValue", p.get("price", 0))
+            p.setdefault("estimatedValue", 0)
             p.setdefault("lotSize", None)
             p.setdefault("yearBuilt", None)
             p.setdefault("daysOnMarket", 0)
@@ -431,14 +430,11 @@ def main():
         json.dump(all_properties, f, indent=2)
     print(f"\n💾 Saved backup to {backup_path}")
     
-    # Clear old data and push to Supabase
+    # Upsert sourced records. Removal is handled only by the guarded,
+    # source-specific refresh jobs after a complete verified snapshot.
     print("\n" + "=" * 70)
     print("🗄️  UPDATING SUPABASE DATABASE")
     print("=" * 70)
-    
-    cleared = clear_supabase_properties()
-    if not cleared:
-        print("   ⚠️  Could not clear via DELETE. Will try to upsert instead.")
     
     inserted = push_to_supabase(all_properties)
     

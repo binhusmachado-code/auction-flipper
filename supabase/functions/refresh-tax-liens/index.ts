@@ -22,7 +22,43 @@ function optionalNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function normalize(record: CatalogRecord, verifiedAt: string) {
+function isPlaceholderImage(value: unknown) {
+  const url = String(value ?? '').toLowerCase()
+  return !url.startsWith('https://') || ['unsplash.com', 'noimage', 'no-image', 'placeholder', 'default-image', 'fallback', 'coming-soon']
+    .some((marker) => url.includes(marker))
+}
+
+async function trustedPhotoProvenance(record: CatalogRecord, verifiedAt: string | null) {
+  if (!verifiedAt || record.photoAssetVerified !== true || !['official_auction', 'government_listing'].includes(String(record.photoSource ?? ''))) return null
+  try {
+    const recordUrl = new URL(String(record.sourceUrl ?? ''))
+    const photoPageUrl = new URL(String(record.photoSourceUrl ?? ''))
+    const imageUrl = new URL(String(record.imageUrl ?? ''))
+    if (imageUrl.protocol !== 'https:' || photoPageUrl.protocol !== 'https:' || isPlaceholderImage(imageUrl.href)) return null
+    if (!allowedSourceHosts.has(photoPageUrl.hostname) || photoPageUrl.href !== recordUrl.href) return null
+    const [listingResponse, imageResponse] = await Promise.all([
+      fetch(photoPageUrl, { signal: AbortSignal.timeout(10_000) }),
+      fetch(imageUrl, { method: 'HEAD', signal: AbortSignal.timeout(10_000) }),
+    ])
+    if (!listingResponse.ok || !imageResponse.ok || !String(imageResponse.headers.get('content-type')).startsWith('image/')) return null
+    const listingHtml = await listingResponse.text()
+    if (!listingHtml.includes(imageUrl.href) && !listingHtml.includes(imageUrl.pathname)) return null
+    const capturedAt = record.photoCapturedAt ? new Date(String(record.photoCapturedAt)) : null
+    return {
+      source: String(record.photoSource),
+      name: record.photoSourceName ? String(record.photoSourceName) : String(record.source ?? 'Official auction photo'),
+      url: photoPageUrl.href,
+      capturedAt: capturedAt && Number.isFinite(capturedAt.getTime()) ? capturedAt.toISOString() : null,
+      verifiedAt,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function normalize(record: CatalogRecord, verifiedAt: string) {
+  const photo = await trustedPhotoProvenance(record, verifiedAt)
+  const imageUrl = isPlaceholderImage(record.imageUrl) ? '' : String(record.imageUrl ?? '')
   return {
     id: String(record.id ?? ''),
     address: String(record.address ?? ''),
@@ -39,14 +75,14 @@ function normalize(record: CatalogRecord, verifiedAt: string) {
     property_type: String(record.propertyType ?? 'Unknown'),
     auction_type: 'Tax Lien',
     sale_type: 'Tax Lien',
-    auction_date: null,
+    auction_date: record.auctionDate ? String(record.auctionDate) : null,
     case_number: record.caseNumber ? String(record.caseNumber) : null,
     parcel_id: record.parcelId ? String(record.parcelId) : null,
     owner_name: record.ownerName ? String(record.ownerName) : null,
     source: String(record.source ?? ''),
     source_url: String(record.sourceUrl ?? ''),
     description: String(record.description ?? ''),
-    image_url: String(record.imageUrl ?? ''),
+    image_url: imageUrl,
     images: Array.isArray(record.images) ? record.images : [],
     status: 'Active',
     latitude: number(record.latitude),
@@ -66,6 +102,19 @@ function normalize(record: CatalogRecord, verifiedAt: string) {
     delinquent_years: number(record.delinquentYears),
     source_hash: null,
     source_verified_at: verifiedAt,
+    selling_authority: record.sellingAuthority ? String(record.sellingAuthority) : null,
+    legal_description: record.legalDescription ? String(record.legalDescription) : null,
+    registration_deadline: record.registrationDeadline ? String(record.registrationDeadline) : null,
+    payment_deadline: record.paymentDeadline ? String(record.paymentDeadline) : null,
+    photo_source: photo?.source ?? (imageUrl ? 'unverified' : null),
+    photo_source_name: photo?.name ?? null,
+    photo_source_url: photo?.url ?? null,
+    photo_captured_at: photo?.capturedAt ?? null,
+    photo_verified_at: photo?.verifiedAt ?? null,
+    occupancy_signal: String(record.occupancySignal ?? 'unknown'),
+    access_status: String(record.accessStatus ?? 'unknown'),
+    permit_status: String(record.permitStatus ?? 'unknown'),
+    utility_status: String(record.utilityStatus ?? 'unknown'),
     updated_at: new Date().toISOString(),
   }
 }
@@ -85,7 +134,7 @@ function denormalize(record: CatalogRecord) {
     propertyType: String(record.property_type ?? 'Unknown'),
     auctionType: 'Tax Lien',
     saleType: 'Tax Lien',
-    auctionDate: null,
+    auctionDate: record.auction_date ? String(record.auction_date) : null,
     caseNumber: record.case_number ? String(record.case_number) : '',
     parcelId: record.parcel_id ? String(record.parcel_id) : '',
     ownerName: record.owner_name ? String(record.owner_name) : '',
@@ -110,6 +159,20 @@ function denormalize(record: CatalogRecord) {
     interestRate: number(record.interest_rate),
     redemptionPeriod: number(record.redemption_period),
     delinquentYears: number(record.delinquent_years),
+    sourceVerifiedAt: record.source_verified_at ? String(record.source_verified_at) : null,
+    sellingAuthority: record.selling_authority ? String(record.selling_authority) : null,
+    legalDescription: record.legal_description ? String(record.legal_description) : null,
+    registrationDeadline: record.registration_deadline ? String(record.registration_deadline) : null,
+    paymentDeadline: record.payment_deadline ? String(record.payment_deadline) : null,
+    photoSource: record.photo_source ? String(record.photo_source) : null,
+    photoSourceName: record.photo_source_name ? String(record.photo_source_name) : null,
+    photoSourceUrl: record.photo_source_url ? String(record.photo_source_url) : null,
+    photoCapturedAt: record.photo_captured_at ? String(record.photo_captured_at) : null,
+    photoVerifiedAt: record.photo_verified_at ? String(record.photo_verified_at) : null,
+    occupancySignal: String(record.occupancy_signal ?? 'unknown'),
+    accessStatus: String(record.access_status ?? 'unknown'),
+    permitStatus: String(record.permit_status ?? 'unknown'),
+    utilityStatus: String(record.utility_status ?? 'unknown'),
   }
 }
 
@@ -179,9 +242,9 @@ Deno.serve(async (request) => {
     }
 
     const verifiedAt = new Date().toISOString()
-    const normalized = records.map((record) => normalize(record, verifiedAt))
+    const normalized = await Promise.all(records.map((record) => normalize(record, verifiedAt)))
     const { supabaseUrl, serviceRoleKey } = await databaseSettings()
-    const syncResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/sync_tax_lien_inventory`, {
+    const syncResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/sync_tax_lien_inventory_v2`, {
       method: 'POST',
       headers: {
         apikey: serviceRoleKey,

@@ -25,9 +25,12 @@ import {
   type ResearchStatus,
 } from '../lib/researchWorkspace'
 import type { Property } from '../types/property'
+import type { PropertyVerificationReport } from '../lib/propertyVerification'
+import AutomatedVerificationPanel from './AutomatedVerificationPanel'
 
 interface Props {
   property: Property
+  verificationReport?: PropertyVerificationReport
 }
 
 const statusOptions: Array<{
@@ -61,7 +64,7 @@ function normalizedRecord(propertyId: string, value: PropertyResearchRecord): Pr
   }
 }
 
-export default function PropertyResearchWorkspace({ property }: Props) {
+export default function PropertyResearchWorkspace({ property, verificationReport }: Props) {
   const empty = createEmptyResearchRecord(property.id)
   const [storedRecord, setStoredRecord] = useLocalStorage<PropertyResearchRecord>(researchWorkspaceStorageKey(property.id), empty)
   const record = normalizedRecord(property.id, storedRecord)
@@ -147,6 +150,7 @@ export default function PropertyResearchWorkspace({ property }: Props) {
 
   return (
     <section className="py-1" aria-labelledby="research-workspace-title">
+      {verificationReport && <div className="mb-6"><AutomatedVerificationPanel report={verificationReport} /></div>}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
           <div className="flex items-center gap-2">

@@ -1,5 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
+  ArrowUpRight,
+  Bath,
+  BedDouble,
   Bell,
   BookOpen,
   CalendarDays,
@@ -9,12 +12,14 @@ import {
   Download,
   Grid2X2,
   Heart,
+  House,
   Landmark,
   LogOut,
   MapPin,
   Menu,
   Search,
   Settings,
+  ShieldAlert,
   SlidersHorizontal,
   Target,
   Table2,
@@ -156,7 +161,7 @@ function PropertyTable({ properties, trackers, favoriteIds, onOpen, onToggleFavo
                   <td className="whitespace-nowrap px-3 py-3.5 align-middle text-[13px] text-slate-700">{date(property.auctionDate)}</td>
                   <td className="px-3 py-3.5 align-middle"><button type="button" onClick={() => onOpen(property)} className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-bold text-emerald-800 hover:text-emerald-600"><Search className="h-3.5 w-3.5" />Quick screen</button></td>
                   <td className="px-3 py-3.5 align-middle"><StatusBadge property={property} tracker={tracker} /></td>
-                  <td className="px-3 py-3.5 align-middle"><span className="whitespace-nowrap text-[12px] text-slate-600">Official source</span></td>
+                  <td className="px-3 py-3.5 align-middle"><span className="whitespace-nowrap text-[12px] text-slate-600">Source linked</span></td>
                   <td className="px-3 py-3.5 align-middle"><div className="flex items-center gap-3"><button type="button" onClick={() => onToggleFavorite(property.id)} aria-label={`${favoriteIds.includes(property.id) ? 'Remove' : 'Save'} ${property.address}`} className="text-slate-700 hover:text-emerald-800"><Heart className={`h-4 w-4 ${favoriteIds.includes(property.id) ? 'fill-emerald-700 text-emerald-700' : ''}`} /></button><a href={property.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open source for ${property.address}`} className="text-slate-700 hover:text-emerald-800"><Download className="h-4 w-4 rotate-180" /></a></div></td>
                 </tr>
               )
@@ -180,13 +185,34 @@ function PropertyTable({ properties, trackers, favoriteIds, onOpen, onToggleFavo
 }
 
 function PropertyGrid({ properties, favoriteIds, onOpen, onToggleFavorite }: { properties: Property[]; favoriteIds: string[]; onOpen: (property: Property) => void; onToggleFavorite: (propertyId: string) => void }) {
-  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{properties.slice(0, 12).map((property) => <article key={property.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white"><PropertyMedia property={property} /><div className="p-4"><div className="flex items-start justify-between gap-3"><button type="button" onClick={() => onOpen(property)} className="min-w-0 text-left"><div className="truncate text-sm font-black text-slate-950">{property.address}</div><div className="mt-1 truncate text-xs text-slate-500">{property.city}, {property.state} {property.zip}</div></button><button type="button" onClick={() => onToggleFavorite(property.id)} aria-label={`${favoriteIds.includes(property.id) ? 'Remove' : 'Save'} ${property.address}`} className="text-slate-600 hover:text-emerald-800"><Heart className={`h-4 w-4 ${favoriteIds.includes(property.id) ? 'fill-emerald-700 text-emerald-700' : ''}`} /></button></div><div className="mt-4 flex items-center justify-between text-xs"><span className="rounded-md bg-emerald-50 px-2 py-1 font-bold text-emerald-800">{property.saleType ?? property.auctionType}</span><span className="font-black text-slate-900">{money(getListedBidAmount(property))}</span></div><button type="button" onClick={() => onOpen(property)} className="mt-4 h-10 w-full rounded-lg bg-emerald-800 text-xs font-bold text-white hover:bg-emerald-700">Review property</button></div></article>)}</div>
+  const [visibleCount, setVisibleCount] = useState(18)
+  useEffect(() => setVisibleCount(18), [properties])
+  const visible = properties.slice(0, visibleCount)
+
+  return <><div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{visible.map((property) => {
+    const isFavorite = favoriteIds.includes(property.id)
+    const listedAmount = getListedBidAmount(property)
+    return <article key={property.id} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-emerald-700/30 hover:shadow-xl hover:shadow-slate-900/10">
+      <div className="relative">
+        <PropertyMedia property={property} />
+        <span className={`absolute left-3 top-3 rounded-md px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide text-white shadow-sm ${property.saleType === 'Tax Lien' ? 'bg-teal-700' : property.auctionType === 'Foreclosure' ? 'bg-sky-700' : 'bg-emerald-800'}`}>{property.saleType ?? property.auctionType}</span>
+        <span className="absolute right-3 top-3 rounded-md bg-amber-200 px-2.5 py-1.5 text-[10px] font-black uppercase text-amber-950 shadow-sm">{date(property.auctionDate)}</span>
+        <button type="button" onClick={() => onToggleFavorite(property.id)} aria-label={`${isFavorite ? 'Remove' : 'Save'} ${property.address}`} className="absolute right-3 top-14 grid h-9 w-9 place-items-center rounded-full border border-white/70 bg-white/95 text-slate-600 shadow-sm hover:text-emerald-800"><Heart className={`h-4 w-4 ${isFavorite ? 'fill-emerald-700 text-emerald-700' : ''}`} /></button>
+      </div>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-4"><button type="button" onClick={() => onOpen(property)} className="min-w-0 text-left"><h3 className="truncate text-[16px] font-black text-slate-950">{property.address}</h3><p className="mt-0.5 truncate text-xs text-slate-500">{property.city}, {property.state} {property.zip}</p></button><div className="shrink-0 text-right"><div className="text-[10px] font-semibold text-slate-500">{property.saleType === 'Tax Lien' ? 'Tax owed' : 'Opening bid'}</div><div className="text-lg font-black text-emerald-800">{money(listedAmount)}</div></div></div>
+        <div className="mt-3 grid grid-cols-2 gap-2 border-y border-slate-100 py-3 text-[11px] text-slate-600"><div className="truncate">Parcel <strong className="text-slate-800">{property.parcelId || 'Not posted'}</strong></div><div className="text-right">Assessed <strong className="text-slate-800">{property.valuationVerified ? money(property.assessedValue) : 'Verify'}</strong></div></div>
+        <div className="mt-3 flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600">{property.beds > 0 && <span className="inline-flex items-center gap-1"><BedDouble className="h-3.5 w-3.5" />{property.beds} beds</span>}{property.baths > 0 && <span className="inline-flex items-center gap-1"><Bath className="h-3.5 w-3.5" />{property.baths} baths</span>}{property.sqft > 0 && <span className="inline-flex items-center gap-1"><House className="h-3.5 w-3.5" />{property.sqft.toLocaleString()} sqft</span>}<span className="ml-auto inline-flex items-center gap-1 font-bold text-amber-700"><ShieldAlert className="h-3.5 w-3.5" />Due diligence</span></div>
+        <button type="button" onClick={() => onOpen(property)} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-800 text-xs font-black text-white hover:bg-emerald-700">Review property<ArrowUpRight className="h-3.5 w-3.5" /></button>
+      </div>
+    </article>
+  })}</div>{visibleCount < properties.length && <div className="mt-6 text-center"><button type="button" onClick={() => setVisibleCount((count) => count + 18)} className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-6 text-sm font-bold text-emerald-900 hover:border-emerald-700 hover:bg-emerald-50">Load more properties<ChevronDown className="h-4 w-4" /></button></div>}</>
 }
 
 export default function CommandCenterLayout({ filter, states, counties, onFilterChange, filteredProperties, trackers, savedSearches, entitlements, upcomingAuctions, membershipTier, hasOwnerAccess, favoriteIds, onOpenProperty, onToggleFavorite, onViewChange, onOpenAccount, onSignOut, exportControl }: Props) {
   const [mobileNav, setMobileNav] = useState(false)
   const [showMoreFilters, setShowMoreFilters] = useState(false)
-  const [layoutMode, setLayoutMode] = useState<'table' | 'grid'>('table')
+  const [layoutMode, setLayoutMode] = useState<'table' | 'grid'>('grid')
   const update = (partial: Partial<DealFilter>) => onFilterChange({ ...filter, ...partial })
   const clear = () => onFilterChange({ state: '', county: '', city: '', minPrice: 0, maxPrice: 10_000_000, propertyType: '', saleType: '', auctionType: '', minInterestRate: 0, maxRedemptionPeriod: 60, keyword: '', analysisStatus: '', dealGrade: '', verifiedValueOnly: false, mappedOnly: false, auctionDateKnownOnly: false, sortBy: 'auction-soonest' })
   const hasFilters = Boolean(filter.state || filter.county || filter.propertyType || filter.saleType || filter.keyword || filter.minPrice || filter.maxPrice < 10_000_000 || filter.verifiedValueOnly || filter.mappedOnly)
@@ -226,8 +252,8 @@ export default function CommandCenterLayout({ filter, states, counties, onFilter
               </div>
               {showMoreFilters && <div className="mb-5 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-4"><label className="text-[12px] font-bold text-slate-600">Property type<select value={filter.propertyType} onChange={(event) => update({ propertyType: event.target.value })} className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"><option value="">All properties</option><option>Single Family</option><option>Condo</option><option>Townhouse</option><option>Land</option><option>Commercial</option></select></label><label className="text-[12px] font-bold text-slate-600">Minimum amount<input type="number" value={filter.minPrice || ''} onChange={(event) => update({ minPrice: Number(event.target.value) || 0 })} placeholder="Any" className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold" /></label><label className="text-[12px] font-bold text-slate-600">Maximum amount<input type="number" value={filter.maxPrice === 10_000_000 ? '' : filter.maxPrice} onChange={(event) => update({ maxPrice: Number(event.target.value) || 10_000_000 })} placeholder="Any" className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold" /></label><label className="flex items-center gap-2 self-end text-[12px] font-bold text-slate-700"><input type="checkbox" checked={filter.verifiedValueOnly} onChange={(event) => update({ verifiedValueOnly: event.target.checked })} className="h-4 w-4 accent-emerald-700" />Verified value only</label></div>}
 
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5"><button type="button" onClick={() => setLayoutMode('table')} className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] ${layoutMode === 'table' ? 'bg-emerald-50 font-bold text-emerald-900' : 'font-semibold text-slate-600 hover:bg-slate-50'}`}><Table2 className="h-4 w-4" />Table</button><button type="button" onClick={() => setLayoutMode('grid')} className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] ${layoutMode === 'grid' ? 'bg-emerald-50 font-bold text-emerald-900' : 'font-semibold text-slate-600 hover:bg-slate-50'}`}><Grid2X2 className="h-4 w-4" />Grid</button><button type="button" onClick={() => onViewChange('calendar')} className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-50"><CalendarDays className="h-4 w-4" />Calendar</button></div><div className="flex items-center gap-2">{exportControl}<button type="button" onClick={() => onViewChange('alerts')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-700 bg-white px-4 text-[13px] font-bold text-emerald-900 hover:bg-emerald-50"><Heart className="h-4 w-4" />Save search</button></div></div>
-              <div className="mb-4 flex items-center justify-between text-[12px] text-slate-500"><span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-700" />Official source records</span><span>Showing 1–{Math.min(25, filteredProperties.length)} of {filteredProperties.length.toLocaleString()}</span></div>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div className="inline-flex rounded-lg border border-slate-300 bg-white p-0.5"><button type="button" onClick={() => setLayoutMode('grid')} className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] ${layoutMode === 'grid' ? 'bg-emerald-50 font-bold text-emerald-900' : 'font-semibold text-slate-600 hover:bg-slate-50'}`}><Grid2X2 className="h-4 w-4" />Grid</button><button type="button" onClick={() => setLayoutMode('table')} className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] ${layoutMode === 'table' ? 'bg-emerald-50 font-bold text-emerald-900' : 'font-semibold text-slate-600 hover:bg-slate-50'}`}><Table2 className="h-4 w-4" />Table</button><button type="button" onClick={() => onViewChange('calendar')} className="inline-flex items-center gap-2 rounded-md px-4 py-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-50"><CalendarDays className="h-4 w-4" />Calendar</button></div><div className="flex items-center gap-2">{exportControl}<button type="button" onClick={() => onViewChange('alerts')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-700 bg-white px-4 text-[13px] font-bold text-emerald-900 hover:bg-emerald-50"><Heart className="h-4 w-4" />Save search</button></div></div>
+              <div className="mb-4 flex items-center justify-between text-[12px] text-slate-500"><span className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-700" />Source-linked inventory</span><span>Showing 1–{Math.min(25, filteredProperties.length)} of {filteredProperties.length.toLocaleString()}</span></div>
               {layoutMode === 'table' ? <PropertyTable properties={filteredProperties} trackers={trackers} favoriteIds={favoriteIds} onOpen={onOpenProperty} onToggleFavorite={onToggleFavorite} /> : <PropertyGrid properties={filteredProperties} favoriteIds={favoriteIds} onOpen={onOpenProperty} onToggleFavorite={onToggleFavorite} />}
             </section>
 

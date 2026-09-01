@@ -18,6 +18,10 @@ export function normalizeProperty(row: PropertyRecord): Property {
     : auctionType === 'Tax Lien' || auctionType === 'Tax Deed'
       ? auctionType
       : undefined
+  const rawPhotoSource = String(row.photo_source ?? row.photoSource ?? '')
+  const photoSource = ['official_auction', 'government_listing', 'licensed_provider', 'member_upload', 'street_view', 'unverified'].includes(rawPhotoSource)
+    ? rawPhotoSource as Property['photoSource']
+    : undefined
 
   return {
     id: String(row.id),
@@ -64,6 +68,20 @@ export function normalizeProperty(row: PropertyRecord): Property {
       : row.valuation_verified === false || row.valuationVerified === false
         ? false
         : undefined,
+    sourceVerifiedAt: row.source_verified_at || row.sourceVerifiedAt ? String(row.source_verified_at ?? row.sourceVerifiedAt) : undefined,
+    sellingAuthority: row.selling_authority || row.sellingAuthority ? String(row.selling_authority ?? row.sellingAuthority) : undefined,
+    legalDescription: row.legal_description || row.legalDescription ? String(row.legal_description ?? row.legalDescription) : undefined,
+    registrationDeadline: row.registration_deadline || row.registrationDeadline ? String(row.registration_deadline ?? row.registrationDeadline) : undefined,
+    paymentDeadline: row.payment_deadline || row.paymentDeadline ? String(row.payment_deadline ?? row.paymentDeadline) : undefined,
+    photoSource,
+    photoSourceName: row.photo_source_name || row.photoSourceName ? String(row.photo_source_name ?? row.photoSourceName) : undefined,
+    photoSourceUrl: row.photo_source_url || row.photoSourceUrl ? String(row.photo_source_url ?? row.photoSourceUrl) : undefined,
+    photoCapturedAt: row.photo_captured_at || row.photoCapturedAt ? String(row.photo_captured_at ?? row.photoCapturedAt) : undefined,
+    photoVerifiedAt: row.photo_verified_at || row.photoVerifiedAt ? String(row.photo_verified_at ?? row.photoVerifiedAt) : undefined,
+    occupancySignal: String(row.occupancy_signal ?? row.occupancySignal ?? 'unknown') as Property['occupancySignal'],
+    accessStatus: String(row.access_status ?? row.accessStatus ?? 'unknown') as Property['accessStatus'],
+    permitStatus: String(row.permit_status ?? row.permitStatus ?? 'unknown') as Property['permitStatus'],
+    utilityStatus: String(row.utility_status ?? row.utilityStatus ?? 'unknown') as Property['utilityStatus'],
   }
 }
 
@@ -173,11 +191,17 @@ export function useSupabaseProperties(hasPrivateAccess = false) {
       const firstPage = (data ?? []) as PropertyRecord[]
       const totalRows = typeof count === 'number' ? count : firstPage.length
       const rows = [...firstPage]
+      if (!cancelled && firstPage.length) {
+        setProperties(firstPage.map(normalizeProperty))
+        setLoading(false)
+      }
       // Large ordered property scans can time out when Supabase receives all
       // remaining ranges concurrently. Load each page in order so an owner
-      // session gets a complete dataset instead of a partial/empty view.
+      // session gets a complete dataset. Publish each completed page so the
+      // first grid is usable immediately while the nationwide inventory fills.
       for (let offset = pageSize; offset < totalRows; offset += pageSize) {
         rows.push(...await fetchPage(offset, Math.min(offset + pageSize - 1, totalRows - 1)))
+        if (!cancelled) setProperties(rows.map(normalizeProperty))
       }
       return rows
     }
@@ -191,7 +215,7 @@ export function useSupabaseProperties(hasPrivateAccess = false) {
       .catch((error) => {
         if (cancelled) return
         console.warn('Live property data unavailable; using official county listings.', error)
-        setProperties(officialTaxDeedProperties)
+        setProperties((current) => current.length ? current : officialTaxDeedProperties)
         setLoading(false)
       })
     return () => { cancelled = true }
@@ -235,6 +259,20 @@ export function useSupabaseProperties(hasPrivateAccess = false) {
       case_number: p.caseNumber,
       opening_bid: p.openingBid,
       deposit_required: p.depositRequired,
+      source_verified_at: p.sourceVerifiedAt,
+      selling_authority: p.sellingAuthority,
+      legal_description: p.legalDescription,
+      registration_deadline: p.registrationDeadline,
+      payment_deadline: p.paymentDeadline,
+      photo_source: p.photoSource,
+      photo_source_name: p.photoSourceName,
+      photo_source_url: p.photoSourceUrl,
+      photo_captured_at: p.photoCapturedAt,
+      photo_verified_at: p.photoVerifiedAt,
+      occupancy_signal: p.occupancySignal,
+      access_status: p.accessStatus,
+      permit_status: p.permitStatus,
+      utility_status: p.utilityStatus,
     }
     const { error } = await supabase.from('properties').insert(row)
     if (error) {

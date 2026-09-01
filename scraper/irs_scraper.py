@@ -476,9 +476,6 @@ def scrape_property_detail(prop: dict) -> dict:
         if img_match:
             result["image_url"] = urljoin(url, img_match.group(1))
 
-    if result["price"]:
-        result["estimated_value"] = int(result["price"] * 1.5)
-
     sale_num = prop.get("sale_number", "")
     if not sale_num and "sale_number" in specs:
         sale_num = specs["sale_number"]

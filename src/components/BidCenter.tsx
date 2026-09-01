@@ -1,15 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, ArrowUpRight, Calculator, Check, CircleDollarSign, ExternalLink, Gavel, Landmark, Loader2, MapPin, ReceiptText, Search, ShieldCheck, UserCheck, WalletCards } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Calculator, Check, CircleDollarSign, ExternalLink, Gavel, Landmark, Loader2, ReceiptText, Search, ShieldCheck, UserCheck, WalletCards } from 'lucide-react'
 import type { Property } from '../types/property'
 import type { BidStepKey, BidWorkflow, BidWorkflowStatus } from '../types/bid'
 import { calculateBidReadiness, getBidRules } from '../lib/bidRules'
 import { useBidWorkflows } from '../hooks/useBidWorkflows'
 import { useToast } from './ToastProvider'
+import type { StoredDealAnalysis } from '../lib/propertyAnalysis'
+import { analyzeTaxDeedScenario } from '../lib/calculator'
+import { applyServerVerificationRun, buildPropertyVerificationReport } from '../lib/propertyVerification'
+import { usePropertyResearch, usePropertyTracking } from '../hooks/useMemberProduct'
+import PropertyMedia from './PropertyMedia'
 
 interface Props {
   userId: string
   properties: Property[]
   favoriteIds: string[]
+  savedAnalyses: Record<string, StoredDealAnalysis>
   onOpenGuide: () => void
   onOpenCalculator: (property: Property) => void
 }
@@ -44,7 +50,7 @@ const purchaseJourney = [
   { label: 'Pay', icon: ReceiptText, color: 'text-emerald-400' },
 ]
 
-export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide, onOpenCalculator }: Props) {
+export default function BidCenter({ userId, properties, favoriteIds, savedAnalyses, onOpenGuide, onOpenCalculator }: Props) {
   const { showToast } = useToast()
   const eligibleProperties = useMemo(() => properties
     .filter((property) => property.saleType === 'Tax Deed' || property.saleType === 'Tax Lien')
@@ -53,12 +59,25 @@ export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide
   const property = eligibleProperties.find((item) => item.id === propertyId) ?? eligibleProperties[0]
   const { workflows, loading, save } = useBidWorkflows(userId, true)
   const workflow = property ? workflows[property.id] ?? blankWorkflow(userId, property.id) : null
+  const research = usePropertyResearch(userId, property?.id ?? null, true)
+  const tracking = usePropertyTracking(userId, 'pro')
+  const savedAnalysis = property ? savedAnalyses[property.id] : undefined
+  const analysis = useMemo(() => savedAnalysis ? analyzeTaxDeedScenario(savedAnalysis.scenario) : null, [savedAnalysis])
+  const provisionalVerificationReport = useMemo(() => property ? buildPropertyVerificationReport({
+    property,
+    sources: research.sources,
+    documents: research.documents,
+    savedAnalysis,
+    tracker: tracking.byPropertyId.get(property.id),
+  }) : null, [property, research.sources, research.documents, savedAnalysis, tracking.byPropertyId])
+  const verificationReport = useMemo(() => provisionalVerificationReport
+    ? applyServerVerificationRun(provisionalVerificationReport, research.serverVerification)
+    : null, [provisionalVerificationReport, research.serverVerification])
   const [maxBid, setMaxBid] = useState('')
   const [reference, setReference] = useState('')
   const [paymentDeadline, setPaymentDeadline] = useState('')
   const [paymentConfirmation, setPaymentConfirmation] = useState('')
   const [working, setWorking] = useState(false)
-  const [imageFailed, setImageFailed] = useState(false)
 
   useEffect(() => {
     setMaxBid(workflow?.maxBid ? String(workflow.maxBid) : '')
@@ -67,7 +86,9 @@ export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide
     setPaymentConfirmation(workflow?.paymentConfirmation ?? '')
   }, [propertyId, workflow?.maxBid, workflow?.officialBidReference, workflow?.paymentDeadline, workflow?.paymentConfirmation])
 
-  useEffect(() => { setImageFailed(false) }, [propertyId])
+  useEffect(() => {
+    if (property && !research.loading && research.evidenceSchemaAvailable) void research.runServerVerification().catch(() => undefined)
+  }, [property?.id, research.evidenceSchemaAvailable, research.loading, research.runServerVerification])
 
   if (!property || !workflow) {
     return <div className="mx-auto max-w-3xl py-16 text-center"><Gavel className="mx-auto h-8 w-8 text-zinc-600" /><h3 className="mt-4 text-xl font-extrabold text-white">No active auction properties</h3><p className="mt-2 text-sm text-zinc-500">A bid workspace will appear when an official property is available.</p></div>
@@ -77,10 +98,16 @@ export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide
   const readiness = calculateBidReadiness(workflow.completedSteps)
   const maxBidNumber = Number(maxBid) > 0 ? Number(maxBid) : null
   const depositEstimate = maxBidNumber === null ? workflow.estimatedDeposit : rules.depositEstimate(maxBidNumber)
+  const calculatedMaximum = analysis?.complete && analysis.maximumBid !== null ? analysis.maximumBid : null
+  const withinCalculatedMaximum = property.saleType === 'Tax Deed'
+    && maxBidNumber !== null && calculatedMaximum !== null && maxBidNumber <= calculatedMaximum
+  const verificationReady = verificationReport?.authoritative === true && verificationReport.overallStatus === 'verified'
+  const safeReady = readiness.ready && verificationReady && withinCalculatedMaximum
 
   const persist = async (patch: Partial<BidWorkflow>, successMessage?: string) => {
     setWorking(true)
     try {
+      if (patch.status && patch.status !== 'researching') await research.runServerVerification()
       await save(property, patch)
       if (successMessage) showToast(successMessage, 'success')
     } catch (error) {
@@ -91,22 +118,43 @@ export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide
   }
 
   const toggleStep = (step: BidStepKey) => {
+    if (step === 'due_diligence' && !verificationReady) {
+      showToast('Finish all nine source-verified checks before completing due diligence', 'error')
+      return
+    }
     const completedSteps = { ...workflow.completedSteps, [step]: !workflow.completedSteps[step] }
     const nextReadiness = calculateBidReadiness(completedSteps)
-    void persist({ completedSteps, status: nextReadiness.ready ? 'ready' : 'researching' })
+    const nextSafeReady = nextReadiness.ready && verificationReady && withinCalculatedMaximum
+    void persist({ completedSteps, status: nextSafeReady ? 'ready' : 'researching' })
   }
 
   const saveLimit = () => {
+    if (property.saleType === 'Tax Lien') {
+      showToast('Tax-lien bid actions stay locked until the certificate yield and redemption-limit calculator is available', 'error')
+      return
+    }
     if (!maxBidNumber) {
       showToast('Enter a maximum bid greater than zero', 'error')
       return
     }
+    if (calculatedMaximum === null) {
+      showToast('Complete the maximum-bid calculator before saving a tax-deed limit', 'error')
+      return
+    }
+    if (calculatedMaximum !== null && maxBidNumber > calculatedMaximum) {
+      showToast(`This exceeds the calculated maximum of ${money(calculatedMaximum)}`, 'error')
+      return
+    }
     const completedSteps = { ...workflow.completedSteps, max_bid: true }
     const nextReadiness = calculateBidReadiness(completedSteps)
-    void persist({ maxBid: maxBidNumber, estimatedDeposit: depositEstimate, completedSteps, status: nextReadiness.ready ? 'ready' : 'researching' }, 'Maximum bid saved')
+    void persist({ maxBid: maxBidNumber, estimatedDeposit: depositEstimate, completedSteps, status: nextReadiness.ready && verificationReady ? 'ready' : 'researching' }, 'Maximum bid saved')
   }
 
   const setOutcome = (status: BidWorkflowStatus) => {
+    if (!safeReady) {
+      showToast('Official bid actions stay locked until all nine evidence checks and the bid limit are verified', 'error')
+      return
+    }
     const completedSteps = status === 'won' || status === 'lost'
       ? { ...workflow.completedSteps, official_bid: true }
       : workflow.completedSteps
@@ -156,7 +204,7 @@ export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide
       <div className="grid gap-7 py-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0">
           <section className="border-y border-zinc-800 py-5" aria-labelledby="bid-readiness-title">
-            <div className="flex items-start justify-between gap-4"><div><h4 id="bid-readiness-title" className="font-bold text-white">Auction readiness</h4><p className="mt-1 text-sm text-zinc-500">{readiness.complete} of {readiness.total} required checks complete</p></div><span className={`rounded-md border px-2.5 py-1 text-xs font-bold ${readiness.ready ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-400'}`}>{readiness.ready ? 'Ready for official auction' : 'Preparation required'}</span></div>
+            <div className="flex items-start justify-between gap-4"><div><h4 id="bid-readiness-title" className="font-bold text-white">Auction readiness</h4><p className="mt-1 text-sm text-zinc-500">{readiness.complete} of {readiness.total} required checks complete · {verificationReport?.verifiedCount ?? 0}/9 evidence checks verified</p></div><span className={`rounded-md border px-2.5 py-1 text-xs font-bold ${safeReady ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-400'}`}>{safeReady ? 'Ready for official auction' : 'Preparation required'}</span></div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-800"><div className="h-full bg-emerald-500 transition-all" style={{ width: `${(readiness.complete / readiness.total) * 100}%` }} /></div>
           </section>
 
@@ -172,7 +220,7 @@ export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide
           <section className="border-t border-zinc-800 py-5" aria-labelledby="bid-limit-title">
             <div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-sky-400" /><h4 id="bid-limit-title" className="text-sm font-bold text-white">Maximum bid</h4></div>
             <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]"><label><span className="mb-1.5 block text-xs font-semibold text-zinc-500">Your hard stop</span><div className="relative"><span className="absolute left-3 top-2.5 text-sm text-zinc-500">$</span><input type="number" min="1" step="100" value={maxBid} onChange={(event) => setMaxBid(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 pl-7 pr-3 text-sm text-white outline-none focus:border-emerald-500" /></div></label><button type="button" onClick={saveLimit} disabled={working} className="h-10 self-end rounded-lg bg-sky-500 px-4 text-sm font-bold text-zinc-950 hover:bg-sky-400 disabled:opacity-50">Save limit</button></div>
-            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs"><span className="text-zinc-500">Opening bid <strong className="text-zinc-300">{property.openingBid !== undefined && property.openingBid > 0 ? money(property.openingBid) : property.price > 0 ? money(property.price) : 'Not posted by county'}</strong></span><span className="text-zinc-500">Estimated deposit <strong className="text-zinc-300">{money(depositEstimate)}</strong></span></div>
+            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs"><span className="text-zinc-500">Opening bid <strong className="text-zinc-300">{property.openingBid !== undefined && property.openingBid > 0 ? money(property.openingBid) : property.price > 0 ? money(property.price) : 'Not posted by county'}</strong></span><span className="text-zinc-500">Calculated safe maximum <strong className="text-zinc-300">{money(calculatedMaximum)}</strong></span><span className="text-zinc-500">Estimated deposit <strong className="text-zinc-300">{money(depositEstimate)}</strong></span></div>
             {property.saleType === 'Tax Deed' ? (
               <button type="button" onClick={() => onOpenCalculator(property)} className="mt-3 flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300"><Calculator className="h-3.5 w-3.5" />Open full maximum-bid calculator</button>
             ) : (
@@ -182,15 +230,15 @@ export default function BidCenter({ userId, properties, favoriteIds, onOpenGuide
 
           <section className="border-t border-zinc-800 py-5" aria-labelledby="official-bid-title">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="flex items-center gap-2"><Landmark className="h-4 w-4 text-amber-400" /><h4 id="official-bid-title" className="text-sm font-bold text-white">Official auction</h4></div><p className="mt-2 max-w-2xl text-xs leading-relaxed text-zinc-500">The county auction provider is the seller and official bid record. Direct submission here remains locked until an authorized connection is approved. Never give this website your county auction password.</p></div><span className="w-fit rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-400">Guided connection</span></div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]"><label><span className="mb-1.5 block text-xs font-semibold text-zinc-500">Official bid or confirmation number</span><input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Enter after the official auction accepts the bid" className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-emerald-500" /></label><a href={property.sourceUrl} target="_blank" rel="noopener noreferrer" className={`flex h-10 items-center justify-center gap-2 self-end rounded-lg px-4 text-sm font-bold ${readiness.ready ? 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400' : 'pointer-events-none bg-zinc-800 text-zinc-600'}`} aria-disabled={!readiness.ready}>Open official bidding<ExternalLink className="h-4 w-4" /></a></div>
-            <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => setOutcome('won')} disabled={!readiness.ready || working} className="h-9 rounded-lg border border-emerald-500/40 px-3 text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-30">I won</button><button type="button" onClick={() => setOutcome('lost')} disabled={!readiness.ready || working} className="h-9 rounded-lg border border-zinc-700 px-3 text-xs font-bold text-zinc-400 hover:bg-zinc-800 disabled:opacity-30">I did not win</button></div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]"><label><span className="mb-1.5 block text-xs font-semibold text-zinc-500">Official bid or confirmation number</span><input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Enter after the official auction accepts the bid" className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-emerald-500" /></label><a href={property.sourceUrl} target="_blank" rel="noopener noreferrer" className={`flex h-10 items-center justify-center gap-2 self-end rounded-lg px-4 text-sm font-bold ${safeReady ? 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400' : 'pointer-events-none bg-zinc-800 text-zinc-600'}`} aria-disabled={!safeReady}>Open official bidding<ExternalLink className="h-4 w-4" /></a></div>
+            <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => setOutcome('won')} disabled={!safeReady || working} className="h-9 rounded-lg border border-emerald-500/40 px-3 text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-30">I won</button><button type="button" onClick={() => setOutcome('lost')} disabled={!safeReady || working} className="h-9 rounded-lg border border-zinc-700 px-3 text-xs font-bold text-zinc-400 hover:bg-zinc-800 disabled:opacity-30">I did not win</button></div>
           </section>
 
           {(workflow.status === 'won' || workflow.status === 'payment_due' || workflow.status === 'paid') && <section className="border-t border-zinc-800 py-5" aria-labelledby="payment-title"><div className="flex items-center gap-2"><CircleDollarSign className="h-4 w-4 text-emerald-400" /><h4 id="payment-title" className="text-sm font-bold text-white">Winning-bid payment</h4></div><p className="mt-2 text-xs leading-relaxed text-zinc-500">{rules.paymentTiming} Send funds only to the county clerk or its authorized auction provider.</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label><span className="mb-1.5 block text-xs font-semibold text-zinc-500">Official deadline</span><input type="datetime-local" value={paymentDeadline} onChange={(event) => setPaymentDeadline(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-emerald-500" /></label><label><span className="mb-1.5 block text-xs font-semibold text-zinc-500">Payment confirmation</span><input value={paymentConfirmation} onChange={(event) => setPaymentConfirmation(event.target.value)} placeholder="County receipt, batch, or wire confirmation" className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-white outline-none focus:border-emerald-500" /></label></div><button type="button" onClick={markPaid} disabled={working || workflow.status === 'paid'} className="mt-3 flex h-10 items-center gap-2 rounded-lg bg-emerald-500 px-4 text-sm font-bold text-zinc-950 hover:bg-emerald-400 disabled:opacity-50">{working ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{workflow.status === 'paid' ? 'Payment recorded' : 'Record official payment'}</button></section>}
         </div>
 
         <aside className="border-t border-zinc-800 pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-          <div className="aspect-[16/10] overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">{property.imageUrl && !imageFailed ? <img src={property.imageUrl} alt={`${property.address} property or location`} onError={() => setImageFailed(true)} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-center"><div><MapPin className="mx-auto h-6 w-6 text-zinc-600" /><div className="mt-2 text-xs font-semibold text-zinc-500">Map location</div></div></div>}</div>
+          <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900"><PropertyMedia property={property} /></div>
           <h4 className="mt-4 text-sm font-bold text-white">{property.address}</h4><p className="mt-1 text-xs text-zinc-500">{property.city}, {property.state} {property.zip}</p>
           <dl className="mt-4 divide-y divide-zinc-800 border-y border-zinc-800 text-xs"><div className="flex justify-between gap-3 py-3"><dt className="text-zinc-500">Auction</dt><dd className="text-right font-semibold text-zinc-300">{shortDate(property.auctionDate)}</dd></div><div className="flex justify-between gap-3 py-3"><dt className="text-zinc-500">County</dt><dd className="text-right font-semibold text-zinc-300">{property.county}</dd></div><div className="flex justify-between gap-3 py-3"><dt className="text-zinc-500">Sale</dt><dd className="text-right font-semibold text-zinc-300">{property.saleType}</dd></div><div className="flex justify-between gap-3 py-3"><dt className="text-zinc-500">Status</dt><dd className="text-right font-semibold capitalize text-zinc-300">{workflow.status.replace(/_/g, ' ')}</dd></div></dl>
           <a href={property.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-4 flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300">Official property record<ArrowUpRight className="h-3.5 w-3.5" /></a>

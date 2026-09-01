@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { PLAN_DEFINITIONS, permittedAlertFrequency } from '../lib/plans'
 import type { DealFilter } from '../types/property'
+import type { ServerVerificationRun } from '../lib/propertyVerification'
 import type {
   AlertFrequency,
   LessonProgress,
@@ -201,6 +202,9 @@ function mapDocument(row: Row): PropertyDocument {
     filename: String(row.filename), mimeType: row.mime_type ? String(row.mime_type) : null,
     sizeBytes: row.size_bytes == null ? null : Number(row.size_bytes), documentType: row.document_type as PropertyDocument['documentType'],
     verifiedAt: row.verified_at ? String(row.verified_at) : null, createdAt: String(row.created_at),
+    sourceUrl: row.source_url ? String(row.source_url) : null,
+    documentDate: row.document_date ? String(row.document_date) : null,
+    evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence as Record<string, unknown> : {},
   }
 }
 
@@ -208,27 +212,47 @@ export function usePropertyResearch(userId: string | null, propertyId: string | 
   const [notes, setNotes] = useState<PropertyNote[]>([])
   const [documents, setDocuments] = useState<PropertyDocument[]>([])
   const [sources, setSources] = useState<PropertySourceRecord[]>([])
+  const [serverVerification, setServerVerification] = useState<ServerVerificationRun | null>(null)
+  const [evidenceSchemaAvailable, setEvidenceSchemaAvailable] = useState(false)
   const [loading, setLoading] = useState(Boolean(userId && propertyId))
 
   const refresh = useCallback(async () => {
     if (!userId || !propertyId || !isSupabaseConfigured) {
-      setNotes([]); setDocuments([]); setSources([]); setLoading(false); return
+      setNotes([]); setDocuments([]); setSources([]); setServerVerification(null); setLoading(false); return
     }
     setLoading(true)
-    const [notesResult, documentsResult, sourcesResult] = await Promise.all([
+    const [notesResult, documentsResult, sourcesResult, schemaResult, verificationResult] = await Promise.all([
       supabase.from('property_notes').select('*').eq('user_id', userId).eq('property_id', propertyId).order('created_at', { ascending: false }),
       supabase.from('property_documents').select('*').eq('user_id', userId).eq('property_id', propertyId).order('created_at', { ascending: false }),
       paidAccess
         ? supabase.from('property_source_records').select('*').eq('property_id', propertyId).order('verified_at', { ascending: false })
         : Promise.resolve({ data: [] }),
+      supabase.from('property_documents').select('source_url').limit(0),
+      supabase.from('property_verification_runs').select('engine_version,overall_status,verified_count,checks,checked_at,last_source_verified_at').eq('user_id', userId).eq('property_id', propertyId).order('checked_at', { ascending: false }).limit(1).maybeSingle(),
     ])
+    setEvidenceSchemaAvailable(!schemaResult.error)
+    const mappedDocuments = ((documentsResult.data ?? []) as Row[]).map(mapDocument)
+    const photoDocuments = mappedDocuments.filter((document) => document.documentType === 'photo')
+    if (photoDocuments.length) {
+      const { data: signedPhotos } = await supabase.storage.from('property-documents').createSignedUrls(
+        photoDocuments.map((document) => document.storagePath),
+        3_600,
+      )
+      const displayUrls = new Map((signedPhotos ?? []).map((photo) => [photo.path, photo.signedUrl]))
+      mappedDocuments.forEach((document) => {
+        document.displayUrl = displayUrls.get(document.storagePath)
+      })
+    }
     setNotes(((notesResult.data ?? []) as Row[]).map(mapNote))
-    setDocuments(((documentsResult.data ?? []) as Row[]).map(mapDocument))
+    setDocuments(mappedDocuments)
     setSources(((sourcesResult.data ?? []) as Row[]).map((row) => ({
       id: String(row.id), propertyId: String(row.property_id), sourceType: row.source_type as PropertySourceRecord['sourceType'],
       sourceName: String(row.source_name), sourceUrl: String(row.source_url), status: row.status as PropertySourceRecord['status'],
       verifiedAt: row.verified_at ? String(row.verified_at) : null, retrievedAt: row.retrieved_at ? String(row.retrieved_at) : null,
+      official: row.official === true,
+      evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence as Record<string, unknown> : {},
     })))
+    setServerVerification(verificationResult.error ? null : verificationResult.data as ServerVerificationRun | null)
     setLoading(false)
   }, [paidAccess, propertyId, userId])
   useEffect(() => { void refresh() }, [refresh])
@@ -240,9 +264,15 @@ export function usePropertyResearch(userId: string | null, propertyId: string | 
     setNotes((current) => [mapNote(data as Row), ...current])
   }, [propertyId, userId])
 
-  const uploadDocument = useCallback(async (file: File, documentType: PropertyDocument['documentType']) => {
+  const uploadDocument = useCallback(async (
+    file: File,
+    documentType: PropertyDocument['documentType'],
+    metadata: { sourceUrl?: string; memberAttested?: boolean } = {},
+  ) => {
     if (!userId || !propertyId) throw new Error('Sign in to add a document')
     if (file.size > 25_000_000) throw new Error('Documents must be 25 MB or smaller')
+    const sourceUrl = metadata.sourceUrl?.trim() || null
+    if (metadata.memberAttested && !sourceUrl?.startsWith('https://')) throw new Error('A source-linked document needs its official HTTPS link')
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-')
     const storagePath = `${userId}/${propertyId}/${crypto.randomUUID()}-${safeName}`
     const { error: uploadError } = await supabase.storage.from('property-documents').upload(storagePath, file, { upsert: false })
@@ -250,15 +280,34 @@ export function usePropertyResearch(userId: string | null, propertyId: string | 
     const { data, error } = await supabase.from('property_documents').insert({
       user_id: userId, property_id: propertyId, storage_path: storagePath, filename: file.name,
       mime_type: file.type || null, size_bytes: file.size, document_type: documentType,
+      source_url: sourceUrl,
+      document_date: null,
+      verified_at: null,
+      evidence: metadata.memberAttested ? { memberAttested: true, providerValidated: false, sourceUrl } : {},
     }).select('*').single()
     if (error) {
       await supabase.storage.from('property-documents').remove([storagePath])
       throw error
     }
-    setDocuments((current) => [mapDocument(data as Row), ...current])
+    const mapped = mapDocument(data as Row)
+    if (documentType === 'photo') {
+      const { data: signed } = await supabase.storage.from('property-documents').createSignedUrl(storagePath, 3_600)
+      mapped.displayUrl = signed?.signedUrl
+    }
+    setDocuments((current) => [mapped, ...current])
   }, [propertyId, userId])
 
-  return { notes, documents, sources, loading, addNote, uploadDocument, refresh }
+  const runServerVerification = useCallback(async () => {
+    if (!userId || !propertyId) throw new Error('Sign in to run verification')
+    if (!evidenceSchemaAvailable) throw new Error('The verification database upgrade is not active yet')
+    const { data, error } = await supabase.rpc('run_property_verification', { target_property_id: propertyId })
+    if (error) throw error
+    const report = data && typeof data === 'object' ? data as ServerVerificationRun : null
+    setServerVerification(report)
+    return report
+  }, [evidenceSchemaAvailable, propertyId, userId])
+
+  return { notes, documents, sources, serverVerification, loading, evidenceSchemaAvailable, addNote, uploadDocument, runServerVerification, refresh }
 }
 
 export function useLearningProgress(userId: string | null) {

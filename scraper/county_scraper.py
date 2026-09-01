@@ -248,7 +248,7 @@ class CountyScraper:
         # Image
         image_url = item.get("imageUrl") or item.get("bingPhotoUrl") or ""
         if not image_url or "fallback" in image_url.lower():
-            image_url = "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"
+            image_url = ""
 
         # Description
         desc_parts = [f"{status_label} property in {city}, {state}."]

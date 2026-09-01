@@ -21,8 +21,8 @@ export default function AddPropertyModal({ onClose, onAdd }: Props) {
     onAdd({
       ...form,
       id: `manual-${Date.now()}`,
-      estimatedValue: form.estimatedValue || form.price || 0,
-      arv: form.arv || form.estimatedValue || form.price || 0,
+      estimatedValue: form.estimatedValue || 0,
+      arv: form.arv || 0,
       rehabEstimate: form.rehabEstimate || 0,
       beds: form.beds || 0,
       baths: form.baths || 0,
@@ -30,12 +30,12 @@ export default function AddPropertyModal({ onClose, onAdd }: Props) {
       daysOnMarket: 0,
       description: form.description || '',
       notes: form.notes || '',
-      imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&auto=format&fit=crop',
+      imageUrl: '',
       images: [],
       latitude: 0,
       longitude: 0,
       county: '',
-      sourceUrl: '#',
+      sourceUrl: '',
       zip: form.zip || '',
     } as Property)
     onClose()

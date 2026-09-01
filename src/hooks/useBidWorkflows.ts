@@ -84,7 +84,15 @@ export function useBidWorkflows(userId: string, enabled: boolean) {
       payment_confirmation: next.paymentConfirmation || null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id,property_id' }).select('*').single()
-    if (error) throw error
+    if (error) {
+      setWorkflows((previous) => {
+        const restored = { ...previous }
+        if (current) restored[property.id] = current
+        else delete restored[property.id]
+        return restored
+      })
+      throw error
+    }
     const saved = fromRow(data)
     setWorkflows((previous) => ({ ...previous, [property.id]: saved }))
     return saved

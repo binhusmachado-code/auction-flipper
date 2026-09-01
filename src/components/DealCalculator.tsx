@@ -256,7 +256,7 @@ export default function DealCalculator({ property, onClose, onSaved }: Props) {
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button type="button" onClick={save} className="flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 text-sm font-bold text-zinc-950 hover:bg-emerald-400"><Save className="h-4 w-4" />Save analysis</button>
-              <a href={property.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 text-sm font-bold text-zinc-200 hover:bg-zinc-700">Official source<ExternalLink className="h-4 w-4" /></a>
+              <a href={property.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 text-sm font-bold text-zinc-200 hover:bg-zinc-700">Open source record<ExternalLink className="h-4 w-4" /></a>
             </div>
             <p className="flex gap-2 text-xs leading-relaxed text-zinc-600"><Check className="mt-0.5 h-3.5 w-3.5 flex-none" />The calculator uses only the numbers and confirmations entered here. It does not invent repairs, fees, value, or title results.</p>
           </aside>

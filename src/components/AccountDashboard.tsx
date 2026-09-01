@@ -7,12 +7,14 @@ import type { Property } from '../types/property'
 import { useToast } from './ToastProvider'
 import AdminCustomerManager from './AdminCustomerManager'
 import BidCenter from './BidCenter'
+import type { StoredDealAnalysis } from '../lib/propertyAnalysis'
 
 interface Props {
   user: User
   profile: AccountProfile
   properties: Property[]
   favoriteIds: string[]
+  savedAnalyses: Record<string, StoredDealAnalysis>
   onClose: () => void
   onOpenGuide: () => void
   onOpenCalculator: (property: Property) => void
@@ -23,7 +25,7 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(value))
 }
 
-export default function AccountDashboard({ user, profile, properties, favoriteIds, onClose, onOpenGuide, onOpenCalculator }: Props) {
+export default function AccountDashboard({ user, profile, properties, favoriteIds, savedAnalyses, onClose, onOpenGuide, onOpenCalculator }: Props) {
   const { showToast } = useToast()
   const [tab, setTab] = useState<'account' | 'bid' | 'manage'>('account')
   const [counts, setCounts] = useState({ favorites: 0, alerts: 0, scenarios: 0 })
@@ -82,6 +84,7 @@ export default function AccountDashboard({ user, profile, properties, favoriteId
                 userId={user.id}
                 properties={properties}
                 favoriteIds={favoriteIds}
+                savedAnalyses={savedAnalyses}
                 onOpenGuide={onOpenGuide}
                 onOpenCalculator={onOpenCalculator}
               />

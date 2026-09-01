@@ -201,6 +201,18 @@ export default function App() {
 
   const saveAnalysis = (record: StoredDealAnalysis) => {
     setSavedAnalyses((current) => ({ ...current, [record.propertyId]: record }))
+    if (accountUserId && hasPrivateAccess) {
+      const results = analyzeTaxDeedScenario(record.scenario)
+      void supabase.from('calculator_scenarios').insert({
+        user_id: accountUserId,
+        property_id: record.propertyId,
+        inputs: record.scenario,
+        results,
+        resale_source: record.scenario.resaleSource || null,
+      }).then(({ error }) => {
+        if (error) showToast('Analysis saved on this device, but the secure bid record could not be updated', 'error')
+      })
+    }
   }
 
   const toggleFavorite = async (id: string) => {
@@ -383,8 +395,8 @@ export default function App() {
           userId={accountUserId}
           paidAccess={hasPrivateAccess}
           tracker={trackerByPropertyId.get(selectedProperty.id)}
-          onTrack={async (propertyId, status) => {
-            try { await updateTracker(propertyId, status); showToast('Tracking status updated', 'success') }
+          onTrack={async (propertyId, status, nextAction, dueAt) => {
+            try { await updateTracker(propertyId, status, nextAction, dueAt); showToast(nextAction && dueAt ? 'Deadline saved' : 'Tracking status updated', 'success') }
             catch (error) { showToast(error instanceof Error ? error.message : 'Unable to update tracking', 'error'); throw error }
           }}
           onOpenCalculator={() => {
@@ -400,6 +412,7 @@ export default function App() {
           profile={profile}
           properties={currentProperties}
           favoriteIds={favorites}
+          savedAnalyses={savedAnalyses}
           onClose={() => setShowAccountDashboard(false)}
           onOpenGuide={() => {
             setShowAccountDashboard(false)
