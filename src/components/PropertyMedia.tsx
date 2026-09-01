@@ -69,16 +69,16 @@ export default function PropertyMedia({ property, variant = 'card' }: Props) {
           alt={`${property.address} property`}
           loading="lazy"
           onError={() => setImageFailed(true)}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover motion-safe:transition-transform motion-safe:duration-700 group-hover:scale-[1.025]"
         />
       ) : maps.image && !mapFailed ? (
         <>
           <img
             src={maps.image}
-            alt={`Street map centered on ${property.address}`}
+            alt={`Aerial imagery centered on ${property.address}`}
             loading="lazy"
             onError={() => setMapFailed(true)}
-            className="h-full w-full object-cover opacity-90"
+            className="h-full w-full object-cover opacity-90 motion-safe:transition-transform motion-safe:duration-700 group-hover:scale-[1.025]"
           />
           <MapPin className="absolute left-1/2 top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-full fill-emerald-700 text-white drop-shadow-lg" />
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-slate-950/80 to-transparent px-3 pb-2 pt-10 text-[10px] font-semibold text-white"><span>Aerial parcel context · not a property photo</span><span>Imagery © Esri</span></div>
